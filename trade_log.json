@@ -1,0 +1,211 @@
+{
+  "trade_events": [
+    {
+      "timestamp": "2025-07-06T16:16:24.072079+00:00",
+      "event": "opened",
+      "symbol": "1000FLOKIUSDT",
+      "rule_id": "Recovered-Unknown",
+      "entry_price": 0.08537,
+      "position_size": 1172.0
+    },
+    {
+      "timestamp": "2025-07-06T16:16:24.072079+00:00",
+      "event": "opened",
+      "symbol": "GUNUSDT",
+      "rule_id": "Recovered-Unknown",
+      "entry_price": 0.03374,
+      "position_size": 2964.0
+    },
+    {
+      "timestamp": "2025-07-06T16:16:24.072079+00:00",
+      "event": "opened",
+      "symbol": "MOODENGUSDT",
+      "rule_id": "Recovered-Unknown",
+      "entry_price": 0.18712,
+      "position_size": 534.0
+    },
+    {
+      "timestamp": "2025-07-06T16:16:24.072079+00:00",
+      "event": "opened",
+      "symbol": "ICNTUSDT",
+      "rule_id": "Recovered-Unknown",
+      "entry_price": 0.2456,
+      "position_size": 406.0
+    },
+    {
+      "timestamp": "2025-07-06T16:16:24.072079+00:00",
+      "event": "opened",
+      "symbol": "BSWUSDT",
+      "rule_id": "Recovered-Unknown",
+      "entry_price": 0.0145,
+      "position_size": 6906.0
+    },
+    {
+      "timestamp": "2025-07-06T16:16:24.072079+00:00",
+      "event": "opened",
+      "symbol": "HUSDT",
+      "rule_id": "Recovered-Unknown",
+      "entry_price": 0.079764,
+      "position_size": 1240.0
+    },
+    {
+      "timestamp": "2025-07-06T16:16:24.072079+00:00",
+      "event": "opened",
+      "symbol": "1000BONKUSDT",
+      "rule_id": "Recovered-Unknown",
+      "entry_price": 0.017794,
+      "position_size": 5600.0
+    },
+    {
+      "timestamp": "2025-07-06T16:16:24.072079+00:00",
+      "event": "opened",
+      "symbol": "TONUSDT",
+      "rule_id": "Recovered-Unknown",
+      "entry_price": 2.9454,
+      "position_size": 33.9
+    },
+    {
+      "timestamp": "2025-07-06T16:23:19.738602+00:00",
+      "event": "closed",
+      "symbol": "HUSDT",
+      "rule_id": "Recovered-Unknown",
+      "reason": "external_close"
+    },
+    {
+      "timestamp": "2025-07-06T16:30:15.422624+00:00",
+      "event": "opened",
+      "symbol": "ENAUSDT",
+      "rule_id": "Rule 8",
+      "entry_price": 0.2608,
+      "position_size": 153.0
+    },
+    {
+      "timestamp": "2025-07-06T16:30:30.941766+00:00",
+      "event": "opened",
+      "symbol": "WLDUSDT",
+      "rule_id": "Rule 8",
+      "entry_price": 0.8867,
+      "position_size": 45.1
+    },
+    {
+      "timestamp": "2025-07-06T16:30:46.384642+00:00",
+      "event": "opened",
+      "symbol": "AI16ZUSDT",
+      "rule_id": "Rule 8",
+      "entry_price": 0.156,
+      "position_size": 256.0
+    },
+    {
+      "timestamp": "2025-07-06T16:31:00.810768+00:00",
+      "event": "opened",
+      "symbol": "NEARUSDT",
+      "rule_id": "Rule 8",
+      "entry_price": 2.189,
+      "position_size": 18.2
+    },
+    {
+      "timestamp": "2025-07-06T16:31:11.494335+00:00",
+      "event": "opened",
+      "symbol": "SOLUSDT",
+      "rule_id": "Rule 8",
+      "entry_price": 151.72,
+      "position_size": 0.2
+    },
+    {
+      "timestamp": "2025-07-06T16:31:27.046857+00:00",
+      "event": "opened",
+      "symbol": "ONDOUSDT",
+      "rule_id": "Rule 8",
+      "entry_price": 0.7932,
+      "position_size": 50.0
+    },
+    {
+      "timestamp": "2025-07-06T16:31:37.455304+00:00",
+      "event": "opened",
+      "symbol": "POPCATUSDT",
+      "rule_id": "Rule 8",
+      "entry_price": 0.3051,
+      "position_size": 131.0
+    },
+    {
+      "timestamp": "2025-07-06T16:31:49.679127+00:00",
+      "event": "opened",
+      "symbol": "UXLINKUSDT",
+      "rule_id": "Rule 8",
+      "entry_price": 0.3884,
+      "position_size": 102.0
+    },
+    {
+      "timestamp": "2025-07-06T16:31:59.974210+00:00",
+      "event": "opened",
+      "symbol": "TIAUSDT",
+      "rule_id": "Rule 8",
+      "entry_price": 1.518,
+      "position_size": 26.3
+    },
+    {
+      "timestamp": "2025-07-06T16:32:10.561110+00:00",
+      "event": "opened",
+      "symbol": "ALPHAUSDT",
+      "rule_id": "Rule 8",
+      "entry_price": 0.01214,
+      "position_size": 3294.0
+    },
+    {
+      "timestamp": "2025-07-06T16:32:21.160879+00:00",
+      "event": "opened",
+      "symbol": "ARBUSDT",
+      "rule_id": "Rule 8",
+      "entry_price": 0.3318,
+      "position_size": 120.5
+    },
+    {
+      "timestamp": "2025-07-06T16:32:32.213944+00:00",
+      "event": "opened",
+      "symbol": "SPXUSDT",
+      "rule_id": "Rule 8",
+      "entry_price": 1.2534,
+      "position_size": 31.0
+    },
+    {
+      "timestamp": "2025-07-06T16:32:41.721368+00:00",
+      "event": "opened",
+      "symbol": "AVAXUSDT",
+      "rule_id": "Rule 8",
+      "entry_price": 18.226,
+      "position_size": 2.1
+    },
+    {
+      "timestamp": "2025-07-06T16:32:57.160585+00:00",
+      "event": "opened",
+      "symbol": "DOGEUSDT",
+      "rule_id": "Rule 8",
+      "entry_price": 0.17067,
+      "position_size": 234.0
+    },
+    {
+      "timestamp": "2025-07-06T16:33:08.565652+00:00",
+      "event": "opened",
+      "symbol": "FARTCOINUSDT",
+      "rule_id": "Rule 8",
+      "entry_price": 1.1863,
+      "position_size": 33.0
+    },
+    {
+      "timestamp": "2025-07-06T16:33:22.572291+00:00",
+      "event": "opened",
+      "symbol": "WIFUSDT",
+      "rule_id": "Rule 8",
+      "entry_price": 0.8874,
+      "position_size": 45.0
+    },
+    {
+      "timestamp": "2025-07-06T16:33:32.887732+00:00",
+      "event": "opened",
+      "symbol": "1000PEPEUSDT",
+      "rule_id": "Rule 8",
+      "entry_price": 0.010037,
+      "position_size": 3900.0
+    }
+  ]
+}
