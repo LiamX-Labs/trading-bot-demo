@@ -206,6 +206,250 @@
       "rule_id": "Rule 8",
       "entry_price": 0.010037,
       "position_size": 3900.0
+    },
+    {
+      "timestamp": "2025-07-06T16:33:42.999410+00:00",
+      "event": "opened",
+      "symbol": "GALAUSDT",
+      "rule_id": "Rule 8",
+      "entry_price": 0.01425,
+      "position_size": 2807.0
+    },
+    {
+      "timestamp": "2025-07-06T16:33:53.368294+00:00",
+      "event": "opened",
+      "symbol": "LINKUSDT",
+      "rule_id": "Rule 8",
+      "entry_price": 13.442,
+      "position_size": 2.9
+    },
+    {
+      "timestamp": "2025-07-06T16:34:04.750667+00:00",
+      "event": "opened",
+      "symbol": "PNUTUSDT",
+      "rule_id": "Rule 8",
+      "entry_price": 0.2252,
+      "position_size": 177.0
+    },
+    {
+      "timestamp": "2025-07-06T16:34:15.610868+00:00",
+      "event": "opened",
+      "symbol": "1000NEIROCTOUSDT",
+      "rule_id": "Rule 8",
+      "entry_price": 0.4364,
+      "position_size": 91.0
+    },
+    {
+      "timestamp": "2025-07-06T16:34:25.822765+00:00",
+      "event": "opened",
+      "symbol": "MOODENGUSDT",
+      "rule_id": "Rule 8",
+      "entry_price": 0.1888,
+      "position_size": 211.0
+    },
+    {
+      "timestamp": "2025-07-06T16:34:36.156329+00:00",
+      "event": "opened",
+      "symbol": "GORKUSDT",
+      "rule_id": "Rule 8",
+      "entry_price": 0.00916,
+      "position_size": 4360.0
+    },
+    {
+      "timestamp": "2025-07-06T16:34:59.071767+00:00",
+      "event": "closed",
+      "symbol": "1000FLOKIUSDT",
+      "rule_id": "Recovered-Unknown",
+      "reason": "external_close"
+    },
+    {
+      "timestamp": "2025-07-06T16:34:59.072984+00:00",
+      "event": "closed",
+      "symbol": "GUNUSDT",
+      "rule_id": "Recovered-Unknown",
+      "reason": "external_close"
+    },
+    {
+      "timestamp": "2025-07-06T16:34:59.073856+00:00",
+      "event": "closed",
+      "symbol": "ICNTUSDT",
+      "rule_id": "Recovered-Unknown",
+      "reason": "external_close"
+    },
+    {
+      "timestamp": "2025-07-06T16:34:59.074979+00:00",
+      "event": "closed",
+      "symbol": "BSWUSDT",
+      "rule_id": "Recovered-Unknown",
+      "reason": "external_close"
+    },
+    {
+      "timestamp": "2025-07-06T16:34:59.076214+00:00",
+      "event": "closed",
+      "symbol": "1000BONKUSDT",
+      "rule_id": "Recovered-Unknown",
+      "reason": "external_close"
+    },
+    {
+      "timestamp": "2025-07-06T16:34:59.077254+00:00",
+      "event": "closed",
+      "symbol": "TONUSDT",
+      "rule_id": "Recovered-Unknown",
+      "reason": "external_close"
+    },
+    {
+      "timestamp": "2025-07-06T16:34:59.078447+00:00",
+      "event": "closed",
+      "symbol": "ENAUSDT",
+      "rule_id": "Rule 8",
+      "reason": "external_close"
+    },
+    {
+      "timestamp": "2025-07-06T16:34:59.079690+00:00",
+      "event": "closed",
+      "symbol": "WLDUSDT",
+      "rule_id": "Rule 8",
+      "reason": "external_close"
+    },
+    {
+      "timestamp": "2025-07-06T16:34:59.080861+00:00",
+      "event": "closed",
+      "symbol": "AI16ZUSDT",
+      "rule_id": "Rule 8",
+      "reason": "external_close"
+    },
+    {
+      "timestamp": "2025-07-06T16:45:16.815076+00:00",
+      "event": "closed",
+      "symbol": "NEARUSDT",
+      "rule_id": "Rule 8",
+      "reason": "external_close"
+    },
+    {
+      "timestamp": "2025-07-06T16:45:16.816794+00:00",
+      "event": "closed",
+      "symbol": "SOLUSDT",
+      "rule_id": "Rule 8",
+      "reason": "external_close"
+    },
+    {
+      "timestamp": "2025-07-06T16:45:16.826714+00:00",
+      "event": "closed",
+      "symbol": "ONDOUSDT",
+      "rule_id": "Rule 8",
+      "reason": "external_close"
+    },
+    {
+      "timestamp": "2025-07-06T16:45:16.827910+00:00",
+      "event": "closed",
+      "symbol": "POPCATUSDT",
+      "rule_id": "Rule 8",
+      "reason": "external_close"
+    },
+    {
+      "timestamp": "2025-07-06T16:45:16.829545+00:00",
+      "event": "closed",
+      "symbol": "UXLINKUSDT",
+      "rule_id": "Rule 8",
+      "reason": "external_close"
+    },
+    {
+      "timestamp": "2025-07-06T16:45:16.831005+00:00",
+      "event": "closed",
+      "symbol": "TIAUSDT",
+      "rule_id": "Rule 8",
+      "reason": "external_close"
+    },
+    {
+      "timestamp": "2025-07-06T16:45:16.832419+00:00",
+      "event": "closed",
+      "symbol": "ALPHAUSDT",
+      "rule_id": "Rule 8",
+      "reason": "external_close"
+    },
+    {
+      "timestamp": "2025-07-06T16:45:16.834022+00:00",
+      "event": "closed",
+      "symbol": "ARBUSDT",
+      "rule_id": "Rule 8",
+      "reason": "external_close"
+    },
+    {
+      "timestamp": "2025-07-06T16:45:16.835565+00:00",
+      "event": "closed",
+      "symbol": "SPXUSDT",
+      "rule_id": "Rule 8",
+      "reason": "external_close"
+    },
+    {
+      "timestamp": "2025-07-06T16:45:16.836800+00:00",
+      "event": "closed",
+      "symbol": "AVAXUSDT",
+      "rule_id": "Rule 8",
+      "reason": "external_close"
+    },
+    {
+      "timestamp": "2025-07-06T16:45:16.838489+00:00",
+      "event": "closed",
+      "symbol": "DOGEUSDT",
+      "rule_id": "Rule 8",
+      "reason": "external_close"
+    },
+    {
+      "timestamp": "2025-07-06T16:45:16.840080+00:00",
+      "event": "closed",
+      "symbol": "FARTCOINUSDT",
+      "rule_id": "Rule 8",
+      "reason": "external_close"
+    },
+    {
+      "timestamp": "2025-07-06T16:45:16.841558+00:00",
+      "event": "closed",
+      "symbol": "WIFUSDT",
+      "rule_id": "Rule 8",
+      "reason": "external_close"
+    },
+    {
+      "timestamp": "2025-07-06T16:45:16.843036+00:00",
+      "event": "closed",
+      "symbol": "1000PEPEUSDT",
+      "rule_id": "Rule 8",
+      "reason": "external_close"
+    },
+    {
+      "timestamp": "2025-07-06T16:45:16.844812+00:00",
+      "event": "closed",
+      "symbol": "GALAUSDT",
+      "rule_id": "Rule 8",
+      "reason": "external_close"
+    },
+    {
+      "timestamp": "2025-07-06T16:45:16.846562+00:00",
+      "event": "closed",
+      "symbol": "LINKUSDT",
+      "rule_id": "Rule 8",
+      "reason": "external_close"
+    },
+    {
+      "timestamp": "2025-07-06T16:45:16.848394+00:00",
+      "event": "closed",
+      "symbol": "PNUTUSDT",
+      "rule_id": "Rule 8",
+      "reason": "external_close"
+    },
+    {
+      "timestamp": "2025-07-06T16:45:16.850090+00:00",
+      "event": "closed",
+      "symbol": "1000NEIROCTOUSDT",
+      "rule_id": "Rule 8",
+      "reason": "external_close"
+    },
+    {
+      "timestamp": "2025-07-06T16:45:16.851337+00:00",
+      "event": "closed",
+      "symbol": "GORKUSDT",
+      "rule_id": "Rule 8",
+      "reason": "external_close"
     }
   ]
 }
