@@ -43,12 +43,12 @@ def safe_float(value, default=0.0):
 
 # ─── RiskManager Class ────────────────────────────────────────────────────────
 class RiskManager:
-    def __init__(self, active_trades: dict, enable_snapshot: bool = True):
+    def __init__(self, active_trades_getter, enable_snapshot: bool = True):
         """
-        active_trades: dict mapping (symbol, rule_id) -> metadata
+        active_trades_getter: function that returns current active_trades dict
         enable_snapshot: whether to schedule the midnight balance snapshot
         """
-        self.active_trades = active_trades
+        self._get_active_trades = active_trades_getter
 
         # Unrealized PnL drawdown state
         self.armed_unrealized = False
@@ -174,7 +174,7 @@ class RiskManager:
                 send_telegram_message(
                     f"⚠️ Unrealized drawdown ≥30% ({drawdown*100:.1f}%) — liquidating all positions."
                 )
-                close_all_positions(self.active_trades)
+                close_all_positions(self._get_active_trades())
                 self.armed_unrealized = False
                 self.peak_unrealized = 0.0
 
@@ -191,19 +191,22 @@ class RiskManager:
             send_telegram_message(
                 f"⚠️ Daily balance drop ≥25% ({drop*100:.1f}%) — liquidating all positions."
             )
-            close_all_positions(self.active_trades)
+            close_all_positions(self._get_active_trades())
 
     async def check_break_even(self):
         """
-        OPTIMIZED: Minimal logging version for AWS free tier
+        DEBUGGING: Added debug logging to identify breakeven issues
         """
-        if not self.active_trades:
+        active_trades = self._get_active_trades()
+        if not active_trades:
             return
         
-        # REMOVED: All debug prints except essential ones
+        print(f"🔍 [{datetime.now().strftime('%H:%M:%S')}] Checking breakeven for {len(active_trades)} trades...")
         
-        for (symbol, rule_id) in list(self.active_trades.keys()):
+        for (symbol, rule_id) in list(active_trades.keys()):
             try:
+                print(f"🔍 Checking {symbol} ({rule_id})...")
+                
                 ts = fetch_server_timestamp()
                 params = {"category": "linear", "symbol": symbol}
                 sig = generate_signature(ts, settings.RECV_WINDOW, params)
@@ -222,10 +225,12 @@ class RiskManager:
                 
                 resp_data = resp.json()
                 if resp_data.get("retCode") != 0:
+                    print(f"❌ API error for {symbol}: {resp_data.get('retMsg')}")
                     continue
                 
                 lst = resp_data.get("result", {}).get("list", [])
                 if not lst:
+                    print(f"❌ No position data for {symbol}")
                     continue
 
                 pos = lst[0]
@@ -247,31 +252,54 @@ class RiskManager:
                 side = pos.get("side")
                 current_sl = safe_float(pos.get("stopLoss", 0))
 
+                print(f"📊 {symbol} - Size: {size}, Entry: {entry_price}, Mark: {mark_price}, Side: {side}, Current SL: {current_sl}")
+
                 if size == 0 or entry_price <= 0:
+                    print(f"❌ Invalid position data for {symbol} - Size: {size}, Entry: {entry_price}")
                     continue
 
                 # Calculate profit percentage
                 unreal_pct = ((mark_price - entry_price) / entry_price) * 100
-                if side == "Sell":
+                if side in ["Sell", "Short"]:
                     unreal_pct = -unreal_pct
 
                 BREAKEVEN_THRESHOLD = settings.BREAKEVEN_THRESHOLD
+                
+                print(f"📈 {symbol} - Profit: {unreal_pct:.2f}%, Threshold: {BREAKEVEN_THRESHOLD}%")
 
                 if unreal_pct >= BREAKEVEN_THRESHOLD:
-                    # Only print when actually triggering
-                    print(f"🚀 Moving {symbol} to breakeven")
+                    print(f"🚀 Moving {symbol} to breakeven (Profit: {unreal_pct:.2f}% >= {BREAKEVEN_THRESHOLD}%)")
                     
-                    # Check if SL already at breakeven
-                    if abs(current_sl - entry_price) < 0.00001:
-                        self.active_trades.pop((symbol, rule_id), None)
+                    # Check if SL already at breakeven with more reasonable tolerance
+                    tolerance = 0.001  # 0.1% tolerance to account for tick size rounding
+                    if abs(current_sl - entry_price) < tolerance:
+                        print(f"✅ {symbol} already at breakeven (SL: {current_sl}, Entry: {entry_price}), removing from tracking")
+                        active_trades.pop((symbol, rule_id), None)
+                        print(f"📝 [{datetime.now().strftime('%H:%M:%S')}] Removed {symbol} ({rule_id}) from active_trades (already at breakeven). Total: {len(active_trades)}")
                         continue
                     
                     from order_manager import move_sl_to_breakeven
                     result = move_sl_to_breakeven(symbol)
                     
+                    print(f"🔧 Breakeven result for {symbol}: {result}")
+                    
                     # Remove from tracking after successful update
                     if result.get("retCode") == 0:
-                        self.active_trades.pop((symbol, rule_id), None)
+                        print(f"✅ Successfully moved {symbol} to breakeven, removing from tracking")
+                        active_trades.pop((symbol, rule_id), None)
+                        print(f"📝 [{datetime.now().strftime('%H:%M:%S')}] Removed {symbol} ({rule_id}) from active_trades (breakeven successful). Total: {len(active_trades)}")
+                    elif result.get("retCode") == 34040:
+                        # "not modified" means already at breakeven
+                        print(f"✅ {symbol} already at breakeven (API confirmed), removing from tracking")
+                        active_trades.pop((symbol, rule_id), None)
+                        print(f"📝 [{datetime.now().strftime('%H:%M:%S')}] Removed {symbol} ({rule_id}) from active_trades (already at breakeven). Total: {len(active_trades)}")
+                    else:
+                        print(f"❌ Failed to move {symbol} to breakeven: {result.get('retMsg')}")
+                else:
+                    print(f"⏳ {symbol} not ready for breakeven yet ({unreal_pct:.2f}% < {BREAKEVEN_THRESHOLD}%)")
                     
             except Exception as e:
                 logger.error(f"Error checking {symbol}: {e}")
+                print(f"❌ Exception checking {symbol}: {e}")
+        
+        print(f"🔍 [{datetime.now().strftime('%H:%M:%S')}] Breakeven check completed")

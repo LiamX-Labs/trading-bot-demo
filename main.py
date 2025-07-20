@@ -40,8 +40,19 @@ active_trades = {}
 processed_bars = set()
 processed_signals = set()
 
+# Global variables for symbol management
+current_symbols = set()
+symbol_last_refresh = 0
+SYMBOL_REFRESH_INTERVAL = 4 * 3600  # 4 hours in seconds
+
+# Global variables for WebSocket management
+ws_connection = None
+ws_symbols_subscribed = set()
+ws_connection = None
+ws_symbols_subscribed = set()
+
 # Instantiate RiskManager and global timestamp tracker
-risk_mgr = RiskManager(active_trades)
+risk_mgr = RiskManager(lambda: active_trades)
 last_update_ts = time.time()
 
 def fetch_symbols():
@@ -135,6 +146,100 @@ async def load_all_historical_data(symbols):
     total_time = time.time() - start_time
     print(f"✅ Historical data loaded in {total_time:.1f}s")
     return results
+
+async def update_websocket_subscription():
+    """Update WebSocket subscription when symbols change"""
+    global ws_connection, ws_symbols_subscribed, current_symbols
+    
+    if ws_connection is None:
+        return
+    
+    try:
+        # Calculate symbols to add and remove
+        symbols_to_add = current_symbols - ws_symbols_subscribed
+        symbols_to_remove = ws_symbols_subscribed - current_symbols
+        
+        if symbols_to_add:
+            add_msg = json.dumps({"op": "subscribe", "args": [f"kline.30.{s}" for s in symbols_to_add]})
+            await ws_connection.send(add_msg)
+            ws_symbols_subscribed.update(symbols_to_add)
+            print(f"🔵 Added {len(symbols_to_add)} symbols to WebSocket subscription")
+        
+        if symbols_to_remove:
+            remove_msg = json.dumps({"op": "unsubscribe", "args": [f"kline.30.{s}" for s in symbols_to_remove]})
+            await ws_connection.send(remove_msg)
+            ws_symbols_subscribed.difference_update(symbols_to_remove)
+            print(f"🔵 Removed {len(symbols_to_remove)} symbols from WebSocket subscription")
+            
+    except Exception as e:
+        print(f"❌ Error updating WebSocket subscription: {e}")
+
+async def refresh_symbols_and_data():
+    """Refresh symbols every 4 hours and load data for new symbols"""
+    global current_symbols, symbol_last_refresh
+    
+    while True:
+        try:
+            await asyncio.sleep(SYMBOL_REFRESH_INTERVAL)
+            
+            print(f"🔄 [{datetime.now().strftime('%H:%M:%S')}] Refreshing symbols (4-hour cycle)...")
+            
+            # Fetch new symbols
+            new_symbols_list = fetch_symbols()
+            new_symbols_set = set(new_symbols_list)
+            
+            print(f"📊 Fetched {len(new_symbols_list)} symbols")
+            
+            # Find new symbols that weren't being monitored
+            new_symbols = new_symbols_set - current_symbols
+            removed_symbols = current_symbols - new_symbols_set
+            
+            if new_symbols:
+                print(f"🆕 New symbols to monitor: {list(new_symbols)}")
+                
+                # Load historical data for new symbols
+                new_symbols_data = await load_all_historical_data(list(new_symbols))
+                
+                # Add new symbols to history and current_symbols
+                for symbol, data in new_symbols_data.items():
+                    if symbol not in history:
+                        history[symbol] = deque(maxlen=50)
+                    if data:
+                        history[symbol].extend(data)
+                    current_symbols.add(symbol)
+                
+                print(f"✅ Loaded data for {len([s for s, d in new_symbols_data.items() if d])} new symbols")
+                
+                # Update WebSocket subscription
+                await update_websocket_subscription()
+                
+                # Send notification about new symbols
+                if len(new_symbols) > 0:
+                    send_telegram_message(f"🔄 Symbol refresh: Added {len(new_symbols)} new symbols to monitoring")
+            
+            if removed_symbols:
+                print(f"🗑️ Removed symbols from monitoring: {list(removed_symbols)}")
+                
+                # Clean up removed symbols from history
+                for symbol in removed_symbols:
+                    if symbol in history:
+                        del history[symbol]
+                
+                # Update WebSocket subscription
+                await update_websocket_subscription()
+                
+                # Send notification about removed symbols
+                send_telegram_message(f"🔄 Symbol refresh: Removed {len(removed_symbols)} symbols from monitoring")
+            
+            # Update current symbols set
+            current_symbols = new_symbols_set
+            symbol_last_refresh = time.time()
+            
+            print(f"✅ [{datetime.now().strftime('%H:%M:%S')}] Symbol refresh completed. Monitoring {len(current_symbols)} symbols")
+            
+        except Exception as e:
+            print(f"❌ Error during symbol refresh: {e}")
+            await asyncio.sleep(300)  # Wait 5 minutes before retrying
 
 def apply_indicators(df):
     """Optimized indicator calculation using vectorization"""
@@ -315,6 +420,7 @@ async def auto_expire_trade(symbol, rule_id, expiry_time):
     
     key = (symbol, rule_id)
     if key in active_trades:
+        print(f"⏰ [{datetime.now().strftime('%H:%M:%S')}] Auto-expiring {symbol} ({rule_id})")
         # Close the trade and log it
         success = order_manager.close_trade(symbol, rule_id, "expiry")
         if success:
@@ -322,6 +428,7 @@ async def auto_expire_trade(symbol, rule_id, expiry_time):
         
         # Remove from active tracking
         del active_trades[key]
+        print(f"📝 [{datetime.now().strftime('%H:%M:%S')}] Removed {symbol} ({rule_id}) from active_trades. Total: {len(active_trades)}")
 
 async def process_kline(msg):
     """OPTIMIZED: Enhanced with proper trade data structure"""
@@ -422,6 +529,7 @@ async def process_kline(msg):
         if trade_data:
             # Store the enhanced trade data (not just expiry time)
             active_trades[trade_key] = trade_data
+            print(f"📝 [{datetime.now().strftime('%H:%M:%S')}] Added {symbol} ({rule_id}) to active_trades. Total: {len(active_trades)}")
             
             # Set up auto-expiry using the expiry time from trade data
             expiry_time = trade_data['expiry_time']
@@ -431,13 +539,27 @@ async def process_kline(msg):
         print(f"⚠️ Error in process_kline: {e}")
 
 async def monitor_symbols(symbols):
-    """WebSocket monitoring with minimal logging"""
-    sub_msg = json.dumps({"op": "subscribe", "args": [f"kline.30.{s}" for s in symbols]})
+    """WebSocket monitoring with dynamic symbol updates"""
+    global current_symbols, ws_connection, ws_symbols_subscribed
     
     while True:
         try:
+            # Get current symbols for subscription
+            symbols_to_monitor = list(current_symbols) if current_symbols else symbols
+            
+            if not symbols_to_monitor:
+                print("⚠️ No symbols to monitor, waiting for refresh...")
+                await asyncio.sleep(60)
+                continue
+            
+            sub_msg = json.dumps({"op": "subscribe", "args": [f"kline.30.{s}" for s in symbols_to_monitor]})
+            
             async with websockets.connect(WS_URL) as ws:
-                print(f"🔵 Connected to WebSocket ({len(symbols)} symbols)")
+                # Store connection reference for dynamic updates
+                ws_connection = ws
+                ws_symbols_subscribed = set(symbols_to_monitor)
+                
+                print(f"🔵 Connected to WebSocket ({len(symbols_to_monitor)} symbols)")
                 await ws.send(sub_msg)
                 
                 async for raw in ws:
@@ -453,6 +575,8 @@ async def monitor_symbols(symbols):
                             
         except Exception as e:
             print(f"🔴 WS error, reconnecting in 5s…")
+            ws_connection = None
+            ws_symbols_subscribed.clear()
             await asyncio.sleep(5)
 
 async def balance_monitor():
@@ -486,16 +610,20 @@ async def watchdog():
             break
 
 async def breakeven_monitor():
-    """OPTIMIZED: Reduced frequency and removed debug logs"""
+    """DEBUGGING: Added debug logging to monitor breakeven checks"""
     print("🔧 Breakeven monitor started")
     
     while True:
         if len(active_trades) == 0:
+            print("🔍 No active trades, sleeping 5 minutes...")
             await asyncio.sleep(300)  # 5 min when no trades
         else:
-            await asyncio.sleep(120)  # CHANGED: 60s -> 120s when trades active
+            print(f"🔍 {len(active_trades)} active trades, checking breakeven in 2 minutes...")
+            await asyncio.sleep(120)  # 2 minutes when trades active
             try:
+                print(f"🔍 [{datetime.now().strftime('%H:%M:%S')}] Running breakeven check...")
                 await risk_mgr.check_break_even()
+                print(f"🔍 [{datetime.now().strftime('%H:%M:%S')}] Breakeven check completed")
             except Exception as e:
                 print(f"⚠️ BE monitor error: {e}")
 
@@ -577,8 +705,15 @@ def get_oldest_trade_info():
 
 async def main():
     try:
+        global current_symbols, symbol_last_refresh
+        
+        # Initial symbol fetch
         symbols = fetch_symbols()
         print(f"📊 Fetched {len(symbols)} symbols")
+        
+        # Initialize current_symbols set
+        current_symbols = set(symbols)
+        symbol_last_refresh = time.time()
         
         historical_data = await load_all_historical_data(symbols)
         
@@ -611,7 +746,8 @@ async def main():
             asyncio.create_task(watchdog()),
             asyncio.create_task(market_diagnostic()),
             asyncio.create_task(memory_cleanup()),
-            asyncio.create_task(position_reconciliation_monitor())  # NEW
+            asyncio.create_task(position_reconciliation_monitor()),  # NEW
+            asyncio.create_task(refresh_symbols_and_data()) # NEW
         ]
         
         print(f"🚀 All systems ready! Monitoring {len(symbols)} symbols...")
@@ -619,7 +755,8 @@ async def main():
         startup_msg = (
             f"🤖 Bot Started - {len(symbols)} symbols, "
             f"{len(active_trades)} active trades, "
-            f"Balance: {risk_mgr.daily_balance_ref:.2f} USDT"
+            f"Balance: {risk_mgr.daily_balance_ref:.2f} USDT\n"
+            f"🔄 Symbol refresh: Every 4 hours"
         )
         send_telegram_message(startup_msg)
         

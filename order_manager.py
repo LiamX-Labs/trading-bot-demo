@@ -415,8 +415,10 @@ def open_trade(symbol, side, price, row, rule_id):
 
 def move_sl_to_breakeven(symbol: str) -> dict:
     """
-    OPTIMIZED: Minimal logging version
+    DEBUGGING: Added debug logging to identify breakeven issues
     """
+    print(f"🔧 Starting breakeven move for {symbol}")
+    
     # Get current position
     ts = fetch_server_timestamp()
     params = {"category": "linear", "symbol": symbol}
@@ -432,8 +434,11 @@ def move_sl_to_breakeven(symbol: str) -> dict:
     resp = requests.get(f"{BASE_URL}/v5/position/list", headers=headers, params=params)
     resp_data = resp.json()
     
+    print(f"🔧 Position data for {symbol}: {resp_data}")
+    
     positions = resp_data.get("result", {}).get("list", [])
     if not positions:
+        print(f"❌ No position found for {symbol}")
         return {"retCode": -1, "retMsg": "No position found"}
 
     pos = positions[0]
@@ -445,10 +450,17 @@ def move_sl_to_breakeven(symbol: str) -> dict:
     
     current_sl = float(pos.get("stopLoss", 0))
     
+    print(f"🔧 {symbol} - Avg Price: {avg_price}, Current SL: {current_sl}")
+    
     if avg_price <= 0:
+        print(f"❌ Invalid entry price for {symbol}: {avg_price}")
         return {"retCode": -1, "retMsg": "Invalid entry price"}
     
-    if abs(current_sl - avg_price) < 0.00001:
+    # Check if already at breakeven with more reasonable tolerance
+    # Bybit rounds stop-loss to tick size, so we need more tolerance
+    tolerance = 0.001  # 0.1% tolerance
+    if abs(current_sl - avg_price) < tolerance:
+        print(f"✅ {symbol} already at breakeven (SL: {current_sl}, Entry: {avg_price})")
         return {"retCode": 0, "retMsg": "Already at breakeven"}
 
     # Build SL-only update payload
@@ -460,6 +472,8 @@ def move_sl_to_breakeven(symbol: str) -> dict:
         "slTriggerBy": "LastPrice"
     }
     body = json.dumps(update, separators=(",", ":"), sort_keys=True)
+    
+    print(f"🔧 Update payload for {symbol}: {body}")
 
     # Sign & send
     ts2 = fetch_server_timestamp()
@@ -469,20 +483,31 @@ def move_sl_to_breakeven(symbol: str) -> dict:
         'X-BAPI-TIMESTAMP': ts2
     })
     
+    print(f"🔧 Sending breakeven request for {symbol}...")
     result = requests.post(f"{BASE_URL}/v5/position/trading-stop", headers=headers, data=body)
     result_data = result.json()
     
-    if result_data.get("retCode") == 0:
-        send_telegram_message(f"🔄 SL→BE: {symbol} @ {avg_price:.6f}")
+    print(f"🔧 Breakeven response for {symbol}: {result_data}")
+    
+    if result_data.get("retCode") == 0 or result_data.get("retCode") == 34040:
+        # 34040 = "not modified" means the stop-loss is already at the requested level
+        if result_data.get("retCode") == 34040:
+            print(f"✅ {symbol} already at breakeven (API confirmed)")
+        else:
+            send_telegram_message(f"🔄 SL→BE: {symbol} @ {avg_price:.6f}")
+            print(f"✅ Successfully moved {symbol} to breakeven")
+        return {"retCode": 0, "retMsg": "Success"}
+    else:
+        print(f"❌ Failed to move {symbol} to breakeven: {result_data.get('retMsg')}")
     
     return result_data
 
 def reconcile_positions_with_tracking(active_trades):
     """
-    Compare tracked trades with actual exchange positions.
-    Remove trades from tracking if position no longer exists.
-    Returns list of externally closed trades.
+    DEBUGGING: Added debug logging to position reconciliation
     """
+    print(f"🔄 Reconciling {len(active_trades)} tracked trades...")
+    
     try:
         ts = fetch_server_timestamp()
         params = {"category": "linear", "settleCoin": "USDT"}
@@ -502,10 +527,12 @@ def reconcile_positions_with_tracking(active_trades):
         )
         
         if resp.status_code != 200:
+            print(f"❌ Position reconciliation API error: {resp.status_code}")
             return []
             
         data = resp.json()
         if data.get("retCode") != 0:
+            print(f"❌ Position reconciliation API error: {data.get('retMsg')}")
             return []
         
         # Get symbols with actual open positions
@@ -516,6 +543,9 @@ def reconcile_positions_with_tracking(active_trades):
             if size > 0:
                 open_positions.add(pos.get("symbol"))
         
+        print(f"🔄 Found {len(open_positions)} actual open positions: {list(open_positions)}")
+        print(f"🔄 Tracking {len(active_trades)} trades: {list(active_trades.keys())}")
+        
         # Check tracked trades against actual positions
         externally_closed = []
         trades_to_remove = []
@@ -525,11 +555,14 @@ def reconcile_positions_with_tracking(active_trades):
             
             # If we're tracking this trade but position doesn't exist
             if symbol not in open_positions:
+                print(f"🔄 Trade {symbol} ({rule_id}) not found in actual positions, marking as externally closed")
                 externally_closed.append((symbol, rule_id))
                 trades_to_remove.append(trade_key)
                 
                 # Log the external closure
                 trade_tracker.log_trade_closed(symbol, rule_id, "external_close")
+            else:
+                print(f"🔄 Trade {symbol} ({rule_id}) confirmed in actual positions")
         
         # Remove externally closed trades from tracking
         for trade_key in trades_to_remove:
