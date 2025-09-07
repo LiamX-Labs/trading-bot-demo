@@ -8,7 +8,7 @@ import requests
 import math
 import time
 from datetime import datetime, timezone, timedelta
-from telegram_alerts import send_telegram_message, batch_notifier
+from telegram_alerts import send_telegram_message
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 from functools import lru_cache
@@ -39,41 +39,31 @@ _last_sync_time = 0
 SYNC_INTERVAL = 300  # Re-sync every 5 minutes
 
 def fetch_server_timestamp():
-    """Get server timestamp with improved sync and caching"""
-    global _time_offset_cache, _last_sync_time
-    
-    current_time = time.time()
-    
-    # Use cached offset if available and recent
-    if _time_offset_cache is not None and (current_time - _last_sync_time) < SYNC_INTERVAL:
-        local_time = int(datetime.now(timezone.utc).timestamp() * 1000)
-        return str(local_time + _time_offset_cache)
-    
-    # Sync with server
+    """Get server timestamp with better error handling and sync"""
     max_retries = 3
     for attempt in range(max_retries):
         try:
-            # Get Bybit server time with shorter timeout
-            resp = requests.get(f"{BASE_URL}/v5/public/time", timeout=3)
-            server_time = int(resp.json()["time"])
-            local_time = int(datetime.now(timezone.utc).timestamp() * 1000)
+            # Get Bybit server time
+            resp = requests.get(f"{BASE_URL}/v5/public/time", timeout=5)
+            server_time = str(resp.json()["time"])
             
-            # Calculate and cache offset
-            _time_offset_cache = server_time - local_time
-            _last_sync_time = current_time
+            # Calculate time difference
+            local_time = str(int(datetime.now(timezone.utc).timestamp() * 1000))
+            time_diff = abs(int(server_time) - int(local_time))
             
-            return str(server_time)
+            # If difference is too large, use server time directly
+            if time_diff > 5000:  # More than 5 seconds difference
+                # REMOVED: Debug print
+                return server_time
+            
+            return local_time
             
         except Exception as e:
             if attempt < max_retries - 1:
-                time.sleep(0.2)  # Shorter retry delay
+                time.sleep(0.5)
                 continue
-            
-            # Fallback: use cached offset or default to local time
-            local_time = int(datetime.now(timezone.utc).timestamp() * 1000)
-            if _time_offset_cache is not None:
-                return str(local_time + _time_offset_cache)
-            return str(local_time)
+            # Fallback to local time
+            return str(int(datetime.now(timezone.utc).timestamp() * 1000))
 
 def generate_signature(timestamp: str, recv_window: str, params: dict = None, body: str = "") -> str:
     """
@@ -409,8 +399,13 @@ def open_trade(symbol, side, price, row, rule_id):
 
     print(f"✅ Opened {symbol} @ {price} Qty={qty}")
 
-    # USE BATCH NOTIFICATION INSTEAD OF INDIVIDUAL MESSAGE
-    batch_notifier.add_trade_alert(symbol, price, tp_price, sl_price, rule_id)
+    # Updated Telegram message with TP
+    msg = (
+        f"🚨 Trade Alert: {symbol}\n"
+        f"Entry: {price} | TP: {tp_price} | SL: {sl_price}\n"
+        f"Rule: {rule_id}"
+    )
+    send_telegram_message(msg)
     
     # RETURN ENHANCED TRADE DATA for active_trades
     return {

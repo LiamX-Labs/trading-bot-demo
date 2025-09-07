@@ -2,16 +2,55 @@
 .env
 .env.local
 .env.production
+.env.staging
 
 # Python
 __pycache__/
-*.pyc
-*.pyo
-*.pyd
+*.py[cod]
+*$py.class
+*.so
 .Python
-env/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+pip-wheel-metadata/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual environments
 venv/
-.venv/
+env/
+ENV/
+.venv
+.env
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
 
 # Logs
 *.log
@@ -21,17 +60,31 @@ logs/
 *.db
 *.sqlite
 
-# Backups
+# Temporary files
+tmp/
+temp/
+*.tmp
+
+# Trading bot specific
+# Keep trade_log.json as it contains active trade data
+# But ignore backup logs
+trade_log_*.json
+
+# Backups (but keep original_backup/ folder)
 backups/
 *.backup
 
-# IDE
-.vscode/settings.json
-.idea/
-
-# OS
-.DS_Store
-Thumbs.db
+# Node modules (if any)
+node_modules/
 
 # Docker
 .dockerignore
+
+# Keep important files - explicitly include
+!original_backup/
+!requirements.txt
+!README.md
+!OPTIMIZATION_SUMMARY.md
+!FIXES_APPLIED.md
+!ISSUE_RESOLUTION.md
+!trade_log.json
