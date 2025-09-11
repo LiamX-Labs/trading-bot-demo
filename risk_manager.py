@@ -43,12 +43,14 @@ def safe_float(value, default=0.0):
 
 # ─── RiskManager Class ────────────────────────────────────────────────────────
 class RiskManager:
-    def __init__(self, active_trades_getter, enable_snapshot: bool = True):
+    def __init__(self, active_trades_getter, enable_snapshot: bool = True, trading_engine=None):
         """
         active_trades_getter: function that returns current active_trades dict
         enable_snapshot: whether to schedule the midnight balance snapshot
+        trading_engine: reference to trading engine for breakeven management
         """
         self._get_active_trades = active_trades_getter
+        self.trading_engine = trading_engine
 
         # Unrealized PnL drawdown state
         self.armed_unrealized = False
@@ -256,6 +258,9 @@ class RiskManager:
 
                 if size == 0 or entry_price <= 0:
                     print(f"❌ Invalid position data for {symbol} - Size: {size}, Entry: {entry_price}")
+                    # Remove from tracking since position is closed
+                    print(f"🔄 Removing closed position {symbol} ({rule_id}) from active_trades")
+                    active_trades.pop((symbol, rule_id), None)
                     continue
 
                 # Calculate profit percentage
@@ -283,16 +288,35 @@ class RiskManager:
                     
                     print(f"🔧 Breakeven result for {symbol}: {result}")
                     
-                    # Remove from tracking after successful update
+                    # Move to breakeven tracking instead of removing completely
                     if result.get("retCode") == 0:
-                        print(f"✅ Successfully moved {symbol} to breakeven, removing from tracking")
-                        active_trades.pop((symbol, rule_id), None)
-                        print(f"📝 [{datetime.now().strftime('%H:%M:%S')}] Removed {symbol} ({rule_id}) from active_trades (breakeven successful). Total: {len(active_trades)}")
+                        print(f"✅ Successfully moved {symbol} to breakeven, moving to breakeven tracking")
+                        # Use trading engine to properly move the trade if available
+                        if self.trading_engine:
+                            success = self.trading_engine.move_trade_to_breakeven(symbol, rule_id)
+                            if success:
+                                print(f"📝 [{datetime.now().strftime('%H:%M:%S')}] Moved {symbol} ({rule_id}) to breakeven tracking. Remaining active: {len(active_trades)}")
+                            else:
+                                # Fallback: remove from active_trades dict
+                                active_trades.pop((symbol, rule_id), None)
+                                print(f"📝 [{datetime.now().strftime('%H:%M:%S')}] Removed {symbol} ({rule_id}) from active_trades (fallback). Total: {len(active_trades)}")
+                        else:
+                            # Fallback: just remove from active_trades
+                            active_trades.pop((symbol, rule_id), None)
+                            print(f"📝 [{datetime.now().strftime('%H:%M:%S')}] Removed {symbol} ({rule_id}) from active_trades (no engine ref). Total: {len(active_trades)}")
                     elif result.get("retCode") == 34040:
                         # "not modified" means already at breakeven
-                        print(f"✅ {symbol} already at breakeven (API confirmed), removing from tracking")
-                        active_trades.pop((symbol, rule_id), None)
-                        print(f"📝 [{datetime.now().strftime('%H:%M:%S')}] Removed {symbol} ({rule_id}) from active_trades (already at breakeven). Total: {len(active_trades)}")
+                        print(f"✅ {symbol} already at breakeven (API confirmed), moving to breakeven tracking")
+                        if self.trading_engine:
+                            success = self.trading_engine.move_trade_to_breakeven(symbol, rule_id)
+                            if success:
+                                print(f"📝 [{datetime.now().strftime('%H:%M:%S')}] Moved {symbol} ({rule_id}) to breakeven tracking (already at BE). Remaining active: {len(active_trades)}")
+                            else:
+                                active_trades.pop((symbol, rule_id), None)
+                                print(f"📝 [{datetime.now().strftime('%H:%M:%S')}] Removed {symbol} ({rule_id}) from active_trades (fallback). Total: {len(active_trades)}")
+                        else:
+                            active_trades.pop((symbol, rule_id), None)
+                            print(f"📝 [{datetime.now().strftime('%H:%M:%S')}] Removed {symbol} ({rule_id}) from active_trades (no engine ref). Total: {len(active_trades)}")
                     else:
                         print(f"❌ Failed to move {symbol} to breakeven: {result.get('retMsg')}")
                 else:

@@ -95,6 +95,115 @@
       "rule_id": "Rule 8",
       "entry_price": 0.279,
       "position_size": 537.0
+    },
+    {
+      "timestamp": "2025-09-11T00:10:01.757594+00:00",
+      "event": "opened",
+      "symbol": "NAORISUSDT",
+      "rule_id": "Rule 6",
+      "entry_price": 0.08762,
+      "position_size": 1710.0
+    },
+    {
+      "timestamp": "2025-09-11T00:20:01.628545+00:00",
+      "event": "opened",
+      "symbol": "KAITOUSDT",
+      "rule_id": "Rule 8",
+      "entry_price": 1.3566,
+      "position_size": 110.0
+    },
+    {
+      "timestamp": "2025-09-11T00:36:19.449607+00:00",
+      "event": "closed",
+      "symbol": "NAORISUSDT",
+      "rule_id": "Rule 6",
+      "reason": "external_close"
+    },
+    {
+      "timestamp": "2025-09-11T00:40:12.866990+00:00",
+      "event": "opened",
+      "symbol": "DAMUSDT",
+      "rule_id": "Rule 8",
+      "entry_price": 0.07007,
+      "position_size": 2140.0
+    },
+    {
+      "timestamp": "2025-09-11T00:45:05.459534+00:00",
+      "event": "opened",
+      "symbol": "HIFIUSDT",
+      "rule_id": "Rule 8",
+      "entry_price": 0.08055,
+      "position_size": 1862.0
+    },
+    {
+      "timestamp": "2025-09-11T00:58:37.830456+00:00",
+      "event": "closed",
+      "symbol": "KAITOUSDT",
+      "rule_id": "Rule 8",
+      "reason": "external_close"
+    },
+    {
+      "timestamp": "2025-09-11T01:05:44.480370+00:00",
+      "event": "closed",
+      "symbol": "DAMUSDT",
+      "rule_id": "Rule 8",
+      "reason": "external_close"
+    },
+    {
+      "timestamp": "2025-09-11T01:17:32.941416+00:00",
+      "event": "opened",
+      "symbol": "PROVEUSDT",
+      "rule_id": "Rule 8",
+      "entry_price": 1.0027,
+      "position_size": 149.0
+    },
+    {
+      "timestamp": "2025-09-11T01:25:41.600743+00:00",
+      "event": "opened",
+      "symbol": "SLFUSDT",
+      "rule_id": "Rule 8",
+      "entry_price": 0.0442,
+      "position_size": 3393.0
+    },
+    {
+      "timestamp": "2025-09-11T01:30:04.669855+00:00",
+      "event": "opened",
+      "symbol": "PTBUSDT",
+      "rule_id": "Rule 8",
+      "entry_price": 0.04353,
+      "position_size": 3440.0
+    },
+    {
+      "timestamp": "2025-09-11T01:35:18.150227+00:00",
+      "event": "opened",
+      "symbol": "BAKEUSDT",
+      "rule_id": "Rule 8",
+      "entry_price": 0.1285,
+      "position_size": 1167.3
+    },
+    {
+      "timestamp": "2025-09-11T01:55:01.809496+00:00",
+      "event": "opened",
+      "symbol": "MYXUSDT",
+      "rule_id": "Rule 8",
+      "entry_price": 17.8543,
+      "position_size": 8.0
+    },
+    {
+      "timestamp": "2025-09-11T02:10:02.699824+00:00",
+      "event": "opened",
+      "symbol": "SAPIENUSDT",
+      "rule_id": "Rule 8",
+      "entry_price": 0.28285,
+      "position_size": 530.0
+    },
+    {
+      "timestamp": "2025-09-11T02:15:01.340213+00:00",
+      "event": "opened",
+      "symbol": "LINEAUSDT",
+      "rule_id": "Rule 8",
+      "entry_price": 0.02464,
+      "position_size": 6080.0
     }
   ]
 }

@@ -1,105 +1,188 @@
-# LXAlgo: Automated Crypto Trading Bot
+# CFT Prop Trading Bot
 
-## Overview
+> Advanced cryptocurrency trading bot with intelligent breakeven management, comprehensive risk controls, and detailed logging.
 
-LXAlgo is an advanced, fully automated cryptocurrency trading bot designed for Bybit USDT perpetual contracts. It features robust risk management, dynamic symbol selection, and seamless Telegram integration for real-time alerts. The bot is optimized for cloud deployment (AWS EC2, Docker) and is suitable for both live and demo trading environments.
+## 🚀 Quick Start
+
+### Prerequisites
+- Python 3.8+
+- Bybit account with API access
+- Telegram bot for notifications
+
+### Installation
+```bash
+# Clone repository
+git clone <repository-url>
+cd cftprop
+
+# Create virtual environment
+python -m venv venv
+source venv/bin/activate  # Linux/Mac
+# or
+venv\Scripts\activate     # Windows
+
+# Install dependencies
+pip install -r requirements.txt
+
+# Configure environment
+cp .env.example .env
+# Edit .env with your API keys
+```
+
+### Configuration
+1. **Set up API credentials** in `.env`
+2. **Configure trading parameters** in `settings.py`
+3. **Set up Telegram notifications**
+4. **Review risk management settings**
+
+### Run the Bot
+```bash
+# New modular version (recommended)
+python src/main.py
+
+# Legacy version
+python main.py
+```
+
+## 📚 Documentation
+
+All documentation has been organized in the `docs/` directory:
+
+### 📋 Core Documentation
+- **[Project Structure](docs/PROJECT_STRUCTURE_CLEAN.md)** - Clean project organization
+- **[Logging & Configuration](docs/LOGGING_AND_CONFIGURATION.md)** - Comprehensive logging system
+- **[Breakeven & Closure System](docs/BREAKEVEN_AND_CLOSURE_SYSTEM.md)** - Enhanced trade management
+
+### 🔧 Setup & Integration
+- **[Trading Dashboard Setup](docs/trading_dashboard_setup.md)** - Dashboard configuration
+- **[Trading Integration Guide](docs/trading_integration_guide.md)** - Integration documentation
+- **[Restructure Guide](docs/RESTRUCTURE_GUIDE.md)** - Architecture overview
+
+### 🛠️ Maintenance & Support
+- **[Fixes Applied](docs/FIXES_APPLIED.md)** - Bug fixes and improvements
+- **[Issue Resolution](docs/ISSUE_RESOLUTION.md)** - Common issues and solutions
+- **[Optimization Summary](docs/OPTIMIZATION_SUMMARY.md)** - Performance improvements
+- **[Git Workflow](docs/GIT_PUSH_SUMMARY.md)** - Development workflow
+
+## ✨ Key Features
+
+### 🎯 Trading Features
+- **Multi-Rule Signal Generation**: 8 different trading rules
+- **Intelligent Position Sizing**: Configurable position sizes
+- **Breakeven Management**: Automatic stop-loss to breakeven moves
+- **Trailing Stops**: Advanced exit strategies
+
+### 🛡️ Risk Management
+- **Two-Tier Drawdown Protection**: Unrealized and daily balance limits
+- **8-Hour Negative PnL Rule**: Automatic closure of losing positions
+- **Position Reconciliation**: Sync with exchange positions
+- **Max Position Limits**: Configurable maximum active trades
+
+### 📊 Monitoring & Logging
+- **Daily Log Rotation**: Organized daily log files
+- **Comprehensive Trade Tracking**: Complete trade lifecycle logging
+- **Real-time Notifications**: Detailed Telegram alerts
+- **System Health Monitoring**: Performance and error tracking
+
+### 🔄 Cooldown System
+- **4-Hour Intervals**: From 12:00 AM UTC (configurable)
+- **Symbol-Level Restrictions**: Prevent overtrading
+- **Automatic Cleanup**: Memory management
+
+## 🏗️ Architecture
+
+### Modular Design
+```
+src/
+├── core/          # Trading engine
+├── data/          # Market data & WebSocket
+├── trading/       # Trade execution
+├── utils/         # Utilities & helpers
+└── config/        # Configuration management
+```
+
+### Legacy Compatibility
+- Original files maintained for compatibility
+- Gradual migration to modular architecture
+- Backward compatibility preserved
+
+## ⚙️ Configuration
+
+### Key Settings (settings.py)
+```python
+# Trading Parameters
+BASE_POSITION_SIZE_USD = 150
+MAX_ACTIVE_TRADES = 30
+BREAKEVEN_THRESHOLD = 8.0
+
+# Risk Management
+NEGATIVE_PNL_CLOSE_HOURS = 8
+SYMBOL_COOLDOWN_HOURS = 4
+
+# Monitoring Intervals
+BREAKEVEN_CHECK_INTERVAL = 120  # seconds
+RECONCILIATION_CHECK_INTERVAL = 600
+```
+
+### Environment Variables (.env)
+```bash
+BYBIT_API_KEY=your_api_key
+BYBIT_API_SECRET=your_secret
+BYBIT_USE_DEMO=true
+TELEGRAM_BOT_TOKEN=your_token
+TELEGRAM_CHAT_ID=your_chat_id
+```
+
+## 📈 Performance
+
+### Optimizations
+- **AWS EC2 t2.micro optimized**: Reduced resource usage
+- **Connection pooling**: Efficient API usage
+- **Memory management**: Automatic cleanup
+- **Rate limiting**: Exchange-compliant requests
+
+### Monitoring
+- **Daily log files**: `logs/cftprop_YYYY-MM-DD.log`
+- **System statistics**: Real-time performance tracking
+- **Error tracking**: Comprehensive error logging
+
+## 🔧 Troubleshooting
+
+### Common Issues
+1. **API Connection Errors**: Check credentials and network
+2. **Missing Notifications**: Verify Telegram setup
+3. **Position Sync Issues**: Review reconciliation logs
+4. **Performance Issues**: Check system resources
+
+### Debug Mode
+Enable debug logging in `settings.py`:
+```python
+LOG_LEVEL = "DEBUG"
+DEBUG_POSITION_RECONCILIATION = True
+DEBUG_BREAKEVEN_MOVES = True
+```
+
+## 📞 Support
+
+- **Documentation**: Check the `docs/` directory
+- **Issues**: Review `docs/ISSUE_RESOLUTION.md`
+- **Logs**: Check `logs/` directory for detailed information
+- **Configuration**: Review all settings in `settings.py`
+
+## 🚨 Important Notes
+
+### Risk Disclaimer
+- **This is trading software**: Use at your own risk
+- **Test thoroughly**: Use demo mode first
+- **Monitor actively**: Review logs and notifications
+- **Understand settings**: Review all configuration options
+
+### Security
+- **Keep API keys secure**: Never commit to version control
+- **Use demo mode**: For testing and development
+- **Monitor positions**: Regular reconciliation checks
+- **Backup configurations**: Save working configurations
 
 ---
 
-## Features
-
-- **Dynamic Symbol Selection**: Monitors the top 100 USDT pairs by 24h volume, refreshing every 4 hours to adapt to market conditions.
-- **Automated Trading**: Executes trades based on technical indicators and custom rules.
-- **Breakeven Logic**: Automatically moves stop-loss to entry price when a trade reaches a configurable profit threshold.
-- **Risk Management**: Includes daily and intraday drawdown protection, auto-expiry of stale trades, and position reconciliation.
-- **Trade Persistence**: Recovers open trades after restarts using a persistent trade log.
-- **Telegram Alerts**: Sends real-time notifications for trade actions, risk events, and system status.
-- **Optimized for Cloud**: Low memory and CPU usage, suitable for AWS free tier and Docker environments.
-
----
-
-## Quick Start (Docker)
-
-1. **Clone the repository:**
-   ```bash
-   git clone <your-repo-url>
-   cd lxalgo
-   ```
-2. **Configure environment variables:**
-   - Copy `.env.example` to `.env` and fill in your Bybit API keys and Telegram bot info.
-3. **Build and run with Docker Compose:**
-   ```bash
-   docker-compose up --build
-   ```
-
----
-
-## Manual Setup (Linux)
-
-1. **Install dependencies:**
-   ```bash
-   python3 -m venv venv
-   source venv/bin/activate
-   pip install -r requirements.txt
-   ```
-2. **Configure environment variables:**
-   - Copy `.env.example` to `.env` and fill in your Bybit API keys and Telegram bot info.
-3. **Run the bot:**
-   ```bash
-   python main.py
-   ```
-
----
-
-## Environment Variables (.env)
-
-- `BYBIT_API_KEY`         - Your Bybit API key
-- `BYBIT_API_SECRET`      - Your Bybit API secret
-- `BYBIT_USE_DEMO`        - `true` for testnet, `false` for mainnet
-- `TELEGRAM_BOT_TOKEN`    - Telegram bot token
-- `TELEGRAM_CHAT_ID`      - Telegram chat ID for alerts
-
----
-
-## Usage & Operation
-
-- **Startup**: The bot fetches the top 100 USDT pairs and loads historical data.
-- **Symbol Refresh**: Every 4 hours, the bot updates its symbol list and WebSocket subscriptions to always monitor the most relevant altcoins.
-- **Trade Logic**: Trades are opened based on technical signals (RSI, volatility, volume, etc.).
-- **Breakeven**: When a trade reaches the configured profit threshold (default: 8%), the stop-loss is moved to entry price.
-- **Risk Management**: Includes auto-expiry (72h), daily/intraday drawdown checks, and reconciliation with Bybit positions.
-- **Telegram Alerts**: All major events (trade open/close, breakeven, risk triggers, errors) are sent to your Telegram chat.
-
----
-
-## Architecture
-
-- `main.py`           - Main event loop, symbol management, monitors
-- `order_manager.py`  - Trade execution, stop-loss, breakeven logic
-- `risk_manager.py`   - Risk checks, drawdown, breakeven monitor
-- `trade_tracker.py`  - Persistent trade log and recovery
-- `telegram_alerts.py`- Telegram notification system
-- `settings.py`       - Configurable parameters
-- `Dockerfile`, `docker-compose.yml` - Containerization
-
----
-
-## Troubleshooting
-
-- **No trades opening?**
-  - Check your Bybit API keys and permissions
-  - Ensure your account has sufficient balance
-- **No Telegram alerts?**
-  - Verify your bot token and chat ID in `.env`
-  - Check for 429 (rate limit) errors in logs
-- **Bot not refreshing symbols?**
-  - Ensure the bot is running continuously; symbol refresh occurs every 4 hours
-- **Breakeven not triggering?**
-  - Check the profit threshold in `settings.py` (`BREAKEVEN_THRESHOLD`)
-  - Review logs for precision/tolerance issues
-
----
-
-## License
-
-MIT License 
+**For detailed setup instructions and advanced configuration, see the documentation in the `docs/` directory.**

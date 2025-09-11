@@ -1,4 +1,9 @@
 # trade_tracker.py - Lightweight trade persistence for handling bot restarts
+# Features:
+# - Logs trade opened/closed events to JSON file
+# - Recovers active trades after bot restarts  
+# - Automatic cleanup of completed trade pairs (opened + closed)
+# - Time-based cleanup of old events (30+ days)
 
 import json
 import os
@@ -149,6 +154,56 @@ class TradeTracker:
             self._write_to_file(data)
             
             print(f"🧹 Cleaned trade log: kept {len(filtered_events)} recent events")
+    
+    def cleanup_closed_trades(self):
+        """Remove closed trade pairs (opened + closed events) to prevent file growth"""
+        with self.lock:
+            data = self._read_from_file()
+            events = data.get("trade_events", [])
+            
+            # Track trade lifecycle: opened -> closed
+            trade_status = {}  # {(symbol, rule_id): 'opened'/'closed'}
+            events_to_keep = []
+            
+            for event in events:
+                try:
+                    symbol = event["symbol"]
+                    rule_id = event["rule_id"]
+                    trade_key = (symbol, rule_id)
+                    event_type = event["event"]
+                    
+                    if event_type == "opened":
+                        trade_status[trade_key] = "opened"
+                        events_to_keep.append(event)
+                    elif event_type == "closed":
+                        if trade_key in trade_status and trade_status[trade_key] == "opened":
+                            # Remove the corresponding opened event
+                            events_to_keep = [e for e in events_to_keep 
+                                            if not (e["symbol"] == symbol and 
+                                                  e["rule_id"] == rule_id and 
+                                                  e["event"] == "opened")]
+                            # Don't keep the closed event either
+                            trade_status[trade_key] = "removed"
+                        else:
+                            # Orphaned close event, keep it for now
+                            events_to_keep.append(event)
+                            
+                except Exception as e:
+                    # Keep malformed events for manual inspection
+                    events_to_keep.append(event)
+                    continue
+            
+            original_count = len(events)
+            cleaned_count = len(events_to_keep)
+            removed_pairs = (original_count - cleaned_count) // 2
+            
+            data["trade_events"] = events_to_keep
+            self._write_to_file(data)
+            
+            if removed_pairs > 0:
+                print(f"🧹 Cleaned {removed_pairs} completed trade pairs from log")
+            
+            return removed_pairs
 
 
 # Global instance

@@ -34,6 +34,7 @@ class TradingEngine:
         
         # State management
         self.active_trades = {}
+        self.breakeven_trades = {}  # Trades moved to breakeven (still count toward max positions)
         self.processed_bars = set()
         self.processed_signals = set()
         self.current_symbols = set()
@@ -168,8 +169,9 @@ class TradingEngine:
         if trade_key in self.active_trades:
             return
         
-        # Check max trades limit
-        if len(self.active_trades) >= trading_config.MAX_ACTIVE_TRADES:
+        # Check max trades limit (include both active and breakeven trades)
+        total_positions = len(self.active_trades) + len(self.breakeven_trades)
+        if total_positions >= trading_config.MAX_ACTIVE_TRADES:
             return
         
         # Check symbol cooldown
@@ -357,13 +359,61 @@ class TradingEngine:
                 await asyncio.sleep(300)  # Wait 5 minutes before retrying
     
     def get_active_trades(self) -> Dict:
-        """Get current active trades"""
+        """Get current active trades (breakeven monitoring)"""
         return self.active_trades.copy()
+    
+    def get_breakeven_trades(self) -> Dict:
+        """Get current breakeven trades"""
+        return self.breakeven_trades.copy()
+    
+    def get_all_trades(self) -> Dict:
+        """Get all trades (active + breakeven) for position counting"""
+        all_trades = self.active_trades.copy()
+        all_trades.update(self.breakeven_trades)
+        return all_trades
+    
+    def move_trade_to_breakeven(self, symbol: str, rule_id: str):
+        """Move trade from active to breakeven tracking"""
+        trade_key = (symbol, rule_id)
+        if trade_key in self.active_trades:
+            trade_data = self.active_trades.pop(trade_key)
+            trade_data['moved_to_breakeven'] = datetime.now(timezone.utc)
+            self.breakeven_trades[trade_key] = trade_data
+            
+            from system_logger import system_logger
+            system_logger.log_breakeven_move(symbol, rule_id, True)
+            system_logger.info(f"Trade moved to breakeven tracking: {symbol} ({rule_id})")
+            
+            return True
+        return False
+    
+    def remove_trade_completely(self, symbol: str, rule_id: str, reason: str = "closed"):
+        """Remove trade from both active and breakeven tracking"""
+        trade_key = (symbol, rule_id)
+        removed_from = None
+        trade_data = None
+        
+        if trade_key in self.active_trades:
+            trade_data = self.active_trades.pop(trade_key)
+            removed_from = "active"
+        elif trade_key in self.breakeven_trades:
+            trade_data = self.breakeven_trades.pop(trade_key)
+            removed_from = "breakeven"
+        
+        if removed_from:
+            from system_logger import system_logger
+            system_logger.log_trade_closure(symbol, rule_id, reason)
+            system_logger.info(f"Trade removed from {removed_from} tracking: {symbol} ({rule_id}) - Reason: {reason}")
+            return trade_data
+        
+        return None
     
     def get_trading_stats(self) -> Dict:
         """Get current trading statistics"""
         return {
             "active_trades": len(self.active_trades),
+            "breakeven_trades": len(self.breakeven_trades),
+            "total_positions": len(self.active_trades) + len(self.breakeven_trades),
             "symbols_monitored": len(self.current_symbols),
             "processed_bars": len(self.processed_bars),
             "processed_signals": len(self.processed_signals),
