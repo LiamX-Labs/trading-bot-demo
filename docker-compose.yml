@@ -1,5 +1,5 @@
 services:
-  trading-bot:
+  AltAlgoprop:
     build: .
     env_file:
       - .env
