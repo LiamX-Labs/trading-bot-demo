@@ -39,8 +39,8 @@ class TradingConfig:
     PUMP_THRESHOLD = 1  # 1% price increase threshold (updated by user)
     
     # Position sizing
-    BASE_POSITION_SIZE_USD = 150
-    MAX_ACTIVE_TRADES = 30
+    BASE_POSITION_SIZE_USD = 200
+    MAX_ACTIVE_TRADES = 20
     
     # Risk management
     STOPLOSS_PERCENT = 8
