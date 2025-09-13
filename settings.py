@@ -37,8 +37,8 @@ PUMP_THRESHOLD = 8
 TIMEFRAME = "5"  # 5-minute timeframe
 
 # Position sizing and risk management
-BASE_POSITION_SIZE_USD = 150
-MAX_ACTIVE_TRADES = 30
+BASE_POSITION_SIZE_USD = 200
+MAX_ACTIVE_TRADES = 20
 
 # Stop loss and take profit settings
 STOPLOSS_PERCENT = 8
