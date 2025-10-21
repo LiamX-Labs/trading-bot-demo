@@ -1,0 +1,212 @@
+# Backtesting V2 - Core Configuration
+# This file contains all core backtest parameters
+
+# =============================================================================
+# BACKTEST PERIOD
+# =============================================================================
+period:
+  start_date: "2025-09-05"  # Start date (YYYY-MM-DD)
+  end_date: "2025-10-20"    # End date (YYYY-MM-DD)
+  timezone: "UTC"           # Timezone for all timestamps
+
+# =============================================================================
+# CAPITAL & POSITION SIZING
+# =============================================================================
+capital:
+  initial_balance: 5000.0     # Starting capital in USD
+  base_position_size: 200.0   # Position size per entry in USD
+  max_active_trades: 30       # Maximum non-breakeven positions
+
+# =============================================================================
+# UNIVERSE CONFIGURATION
+# =============================================================================
+universe:
+  # Token universe filtering
+  min_volume_24h: 10000000    # Minimum 24hr volume ($10M)
+  universe_type: "dynamic"    # "dynamic" or "static"
+
+  # Dynamic universe settings (recommended)
+  dynamic:
+    refresh_frequency: "daily"              # How often universe updates
+    check_signal_validity: true             # Validate each signal against universe at that timestamp
+    universe_snapshots_dir: "../token_universe"  # Directory with daily snapshots
+
+  # Static universe settings (for comparison only)
+  static:
+    use_start_date: true      # Use universe from start_date only
+    universe_file: null       # Optional: custom universe file
+
+# =============================================================================
+# DATA CONFIGURATION
+# =============================================================================
+data:
+  # Data source
+  source: "bybit"             # Data provider
+  timeframe: "5"              # Candle timeframe (5-minute)
+
+  # Data directory
+  data_dir: "../data"         # Where to load/cache candle data
+  cache_enabled: true         # Use cached data when available
+
+  # Data quality
+  min_data_bars: 150          # Minimum bars required before generating signals
+  fill_gaps: true             # Forward-fill missing data
+  validate_data: true         # Run data quality checks
+
+# =============================================================================
+# EXECUTION SIMULATION
+# =============================================================================
+execution:
+  # Order execution
+  execution_delay: 0          # Candles to wait before execution (0 = same candle)
+  order_type: "market"        # Order type (market/limit)
+
+  # Fees and slippage
+  commission_rate: 0.00055    # Bybit taker fee (0.055%)
+  include_slippage: false     # Add slippage model (future enhancement)
+  slippage_bps: 0.0           # Base slippage in basis points
+
+  # Execution realism
+  assume_full_fills: true     # Assume all orders fill completely
+  check_liquidity: false      # Check if order size exceeds liquidity (future)
+
+# =============================================================================
+# PYRAMIDING CONFIGURATION
+# =============================================================================
+pyramiding:
+  enabled: true               # Enable pyramiding (REQUIRED for V2)
+
+  # Pyramiding behavior
+  max_entries_per_symbol: 6 # Max entries per symbol (unlimited)
+  average_entry_price: true   # Recalculate average on each add
+  update_stop_loss: true      # Update SL to new average entry
+  keep_original_tp: true      # Keep TP from first entry
+
+  # Capital allocation
+  same_position_size: true    # Use same position size for all entries
+  allow_pyramid_with_breakeven: true  # Can pyramid even if position at breakeven
+
+# =============================================================================
+# COOLDOWN SETTINGS
+# =============================================================================
+cooldown:
+  # Symbol cooldown
+  symbol_cooldown_enabled: true
+  symbol_cooldown_hours: 4    # Hours between trades on same symbol
+
+  # Cooldown alignment
+  align_to_boundaries: true   # Align to 4-hour UTC boundaries
+  boundary_hours: [0, 4, 8, 12, 16, 20]  # UTC hour boundaries
+
+  # Cleanup
+  cleanup_old_cooldowns: true
+  cleanup_age_hours: 24       # Remove cooldown records older than 24 hours
+
+# =============================================================================
+# OUTPUT CONFIGURATION
+# =============================================================================
+output:
+  # Results directory
+  results_dir: "../results"
+  signals_dir: "../signals"
+  reports_dir: "../reports"
+
+  # Output files
+  save_trades_csv: true       # Save individual trades to CSV
+  save_summary_json: true     # Save summary metrics to JSON
+  save_equity_curve: true     # Save equity curve data
+
+  # Reports
+  generate_pdf: true          # Generate PDF report
+  generate_html: false        # Generate HTML dashboard (future)
+
+  # Filename format
+  filename_template: "{type}_{start}_{end}_{timestamp}"
+  date_format: "%Y%m%d"
+
+# =============================================================================
+# LOGGING & DEBUGGING
+# =============================================================================
+logging:
+  # Log level
+  level: "INFO"               # DEBUG, INFO, WARNING, ERROR
+
+  # Console output
+  show_progress: true         # Show progress during backtest
+  progress_frequency: 1000    # Update every N signals
+
+  # Detailed logging
+  log_signal_processing: false  # Log each signal processed
+  log_position_updates: false   # Log position updates
+  log_exits: true              # Log trade exits
+
+  # Log file
+  save_log_file: true
+  log_dir: "../logs"
+  log_file_template: "backtest_{timestamp}.log"
+
+# =============================================================================
+# PERFORMANCE & OPTIMIZATION
+# =============================================================================
+performance:
+  # Memory management
+  cleanup_frequency: 1000     # Clean up old data every N iterations
+  max_memory_mb: 2048         # Max memory usage (warning threshold)
+
+  # Parallelization (future)
+  use_multiprocessing: false
+  num_workers: 4
+
+# =============================================================================
+# VALIDATION & TESTING
+# =============================================================================
+validation:
+  # Validation checks
+  validate_before_run: true   # Run pre-backtest validation
+  check_data_coverage: true   # Ensure data covers full period
+  check_universe_coverage: true  # Ensure universe snapshots available
+
+  # Expected results (for validation)
+  expected:
+    # For Sept 5-Oct 17 period
+    trades_min: 900
+    trades_max: 1100
+    return_pct_min: 600
+    return_pct_max: 800
+    win_rate_min: 14.0
+    win_rate_max: 18.0
+
+  # Validation tolerance
+  tolerance_pct: 15.0         # ±15% tolerance on expected values
+
+  # Fail behavior
+  fail_on_validation_error: false  # Continue even if validation fails
+  warn_on_out_of_range: true      # Warn if results outside expected range
+
+# =============================================================================
+# ADVANCED SETTINGS
+# =============================================================================
+advanced:
+  # Time-based filtering
+  filter_by_time_of_day: false
+  allowed_hours_utc: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23]
+
+  # Symbol filtering
+  exclude_symbols: []         # List of symbols to exclude
+  include_only_symbols: []    # If not empty, only include these symbols
+
+  # Regime filtering (future)
+  filter_by_regime: false
+  allowed_regimes: ["bull", "bear", "sideways"]
+
+  # Quality filters (future)
+  min_signal_confidence: 0.0  # Minimum confidence score (0-1)
+
+# =============================================================================
+# METADATA
+# =============================================================================
+metadata:
+  config_version: "2.0"
+  created_date: "2025-10-17"
+  description: "Production backtest configuration for Pump Chaser V2"
+  author: "CFT Prop Trading Bot"

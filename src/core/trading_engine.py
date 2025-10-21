@@ -164,29 +164,49 @@ class TradingEngine:
     async def _attempt_trade_execution(self, symbol: str, rule_id: str, price: float, df: pd.DataFrame):
         """Attempt to execute a trade based on signal"""
         trade_key = (symbol, rule_id)
-        
+
+        # ─── CHECK TRADING PAUSE STATUS ────────────────────────────────────────────
+        # Check if trading is allowed (circuit breaker or weekly halt)
+        trading_allowed, reason = self.risk_manager.is_trading_allowed()
+        if not trading_allowed:
+            # Only print this occasionally to avoid spam
+            if not hasattr(self, '_last_pause_warning') or \
+               (datetime.now(timezone.utc) - self._last_pause_warning).total_seconds() > 300:
+                print(f"⛔ Trading paused: {reason}")
+                self._last_pause_warning = datetime.now(timezone.utc)
+            return
+
+        # Get position size multiplier (affected by weekly drawdown)
+        position_multiplier = self.risk_manager.get_position_size_multiplier()
+        if position_multiplier == 0.0:
+            return  # Trading halted
+
         # Check if already have active trade for this symbol/rule
         if trade_key in self.active_trades:
             return
-        
+
         # Check max trades limit (include both active and breakeven trades)
         total_positions = len(self.active_trades) + len(self.breakeven_trades)
         if total_positions >= trading_config.MAX_ACTIVE_TRADES:
             return
-        
+
         # Check symbol cooldown
         if not self.restrictions.can_trade_symbol(symbol):
             return
-        
+
         # Check for existing positions
         if await self._has_open_positions([symbol]):
             await self.risk_manager.check_unrealized_drawdown()
             return
         
         print(f"✅ SIGNAL: {symbol} | {rule_id} @ {price:.6f}")
-        
-        # Execute trade
-        trade_data = self.executor.open_trade(symbol, "buy", price, rule_id)
+
+        # Apply position size multiplier if weekly drawdown active
+        if position_multiplier < 1.0:
+            print(f"📉 Position size reduced to {position_multiplier*100:.0f}% (weekly drawdown protection)")
+
+        # Execute trade with position size multiplier
+        trade_data = self.executor.open_trade(symbol, "buy", price, rule_id, position_size_multiplier=position_multiplier)
         if trade_data:
             # Record trade for cooldown tracking
             self.restrictions.record_trade_for_symbol(symbol)

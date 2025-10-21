@@ -33,7 +33,7 @@ API_RETRY_DELAY = 0.5
 
 # Signal generation parameters
 PUMP_LOOKBACK = 12  # 1 hour = 12 periods of 5min bars
-PUMP_THRESHOLD = 8
+PUMP_THRESHOLD = 8  # 8% pump threshold for backtesting
 TIMEFRAME = "5"  # 5-minute timeframe
 
 # Position sizing and risk management
@@ -53,12 +53,24 @@ BREAKEVEN_THRESHOLD = 8.0  # Profit percentage to trigger breakeven move
 # RISK MANAGEMENT PARAMETERS
 # ═══════════════════════════════════════════════════════════════════════════════
 
-# Unrealized PnL drawdown settings
+# Unrealized PnL drawdown settings (legacy - kept for compatibility)
 UNREALIZED_DRAWDOWN_THRESHOLD = 0.30  # 30% drawdown triggers liquidation
 UNREALIZED_ACTIVATION_MULTIPLIER = 2  # Activation at 2x base position size
 
-# Daily balance drawdown settings
+# Daily balance drawdown settings (legacy - kept for compatibility)
 DAILY_BALANCE_DRAWDOWN_THRESHOLD = 0.25  # 25% daily drop triggers liquidation
+
+# ─── EQUITY-BASED DRAWDOWN SYSTEM ─────────────────────────────────────────────
+# Daily equity drawdown (circuit breaker)
+DAILY_EQUITY_DRAWDOWN_THRESHOLD = 0.02  # 2% daily equity drop triggers circuit breaker
+DAILY_CIRCUIT_BREAKER_PAUSE_HOURS = 24  # Pause trading until next day 00:01 UTC
+
+# Weekly equity drawdown (progressive risk reduction)
+WEEKLY_EQUITY_DRAWDOWN_THRESHOLD_LEVEL1 = 0.04  # 4% weekly drop reduces position size
+WEEKLY_EQUITY_DRAWDOWN_THRESHOLD_LEVEL2 = 0.06  # 6% weekly drop halts trading until Monday
+WEEKLY_POSITION_SIZE_REDUCTION = 0.50  # Reduce position size by 50%
+WEEKLY_RECOVERY_THRESHOLD = 0.50  # Recover 50% of losses to restore full position size
+WEEKLY_HALT_PAUSE_UNTIL_MONDAY = True  # Pause until Monday 00:01 UTC
 
 # Trade age limits
 TRADE_MAX_AGE_HOURS = 72  # Auto-expire trades after 72 hours
@@ -81,13 +93,20 @@ COOLDOWN_CLEANUP_HOURS = 24  # Clean up cooldown records older than 24 hours
 
 # Check intervals (in seconds)
 BALANCE_CHECK_INTERVAL = 300  # 5 minutes
-PNL_CHECK_INTERVAL = 180  # 3 minutes  
+PNL_CHECK_INTERVAL = 180  # 3 minutes
 BREAKEVEN_CHECK_INTERVAL = 120  # 2 minutes
 RECONCILIATION_CHECK_INTERVAL = 600  # 10 minutes
 NEGATIVE_PNL_CHECK_INTERVAL = 1800  # 30 minutes
 MEMORY_CLEANUP_INTERVAL = 3600  # 1 hour
 WATCHDOG_CHECK_INTERVAL = 60  # 1 minute
 MARKET_DIAGNOSTIC_INTERVAL = 1800  # 30 minutes
+EQUITY_DRAWDOWN_CHECK_INTERVAL = 180  # 3 minutes (equity-based drawdown checks)
+
+# Performance analysis intervals
+PERFORMANCE_ANALYSIS_DAILY_HOUR = 0  # Daily analysis at 00:01 UTC
+PERFORMANCE_ANALYSIS_DAILY_MINUTE = 1
+PERFORMANCE_ANALYSIS_WEEKLY_DAY = 0  # Monday (0=Monday, 6=Sunday)
+PERFORMANCE_ANALYSIS_MONTHLY_DAY = 1  # 1st day of month
 
 # Symbol refresh settings
 SYMBOL_REFRESH_INTERVAL = 14400  # 4 hours

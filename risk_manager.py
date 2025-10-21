@@ -52,15 +52,32 @@ class RiskManager:
         self._get_active_trades = active_trades_getter
         self.trading_engine = trading_engine
 
-        # Unrealized PnL drawdown state
+        # Unrealized PnL drawdown state (legacy)
         self.armed_unrealized = False
         self.peak_unrealized = 0.0
         self.activation_level = 2 * settings.BASE_POSITION_SIZE_USD
 
-        # Daily balance drawdown state
+        # Daily balance drawdown state (legacy)
         self.daily_balance_ref = None
+
+        # ─── EQUITY-BASED DRAWDOWN SYSTEM ─────────────────────────────────────────
+        # Daily equity tracking
+        self.daily_equity_start = None
+        self.daily_circuit_breaker_active = False
+        self.daily_circuit_breaker_end_time = None
+
+        # Weekly equity tracking
+        self.weekly_equity_start = None
+        self.weekly_equity_peak = None
+        self.weekly_drawdown_level = 0  # 0=normal, 1=4% (reduced size), 2=6% (halted)
+        self.weekly_halt_end_time = None
+        self.position_size_multiplier = 1.0  # 1.0=full size, 0.5=half size
+
+        # Initialize equity snapshots
         if enable_snapshot:
             self._schedule_midnight_snapshot()
+            self._schedule_performance_analysis()
+
         # Check if we need to arm unrealized monitoring on startup
         self._check_initial_unrealized_state()
     
@@ -88,14 +105,160 @@ class RiskManager:
             asyncio.set_event_loop(loop)
         loop.call_later(delay, lambda: asyncio.create_task(self._snapshot_balance()))
 
-    async def _snapshot_balance(self):
+    def _schedule_performance_analysis(self):
+        """Schedule automated performance analysis tasks"""
+        now = datetime.now(timezone.utc)
+
+        # Schedule daily analysis (00:01 UTC)
+        next_day = datetime.combine(now.date() + timedelta(days=1), dtime(0, 1), tzinfo=timezone.utc)
+        delay_daily = (next_day - now).total_seconds()
+
         try:
+            loop = asyncio.get_event_loop()
+        except RuntimeError:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+
+        loop.call_later(delay_daily, lambda: asyncio.create_task(self._run_daily_performance_analysis()))
+
+    async def _snapshot_balance(self):
+        """Take daily equity snapshot and reset circuit breakers"""
+        try:
+            current_equity = self.get_current_equity()
             self.daily_balance_ref = self.get_account_balance()
-            send_telegram_message(f"📸 Daily balance: {self.daily_balance_ref:.2f} USDT")
+
+            # Set daily equity start
+            self.daily_equity_start = current_equity
+
+            # Set weekly equity start if Monday
+            now = datetime.now(timezone.utc)
+            if now.weekday() == 0:  # Monday
+                self.weekly_equity_start = current_equity
+                self.weekly_equity_peak = current_equity
+                self.weekly_drawdown_level = 0
+                self.position_size_multiplier = 1.0
+                send_telegram_message(f"📅 Weekly equity reset: ${current_equity:.2f}")
+
+            # Reset daily circuit breaker
+            self.daily_circuit_breaker_active = False
+            self.daily_circuit_breaker_end_time = None
+
+            send_telegram_message(f"📸 Daily equity snapshot: ${current_equity:.2f}")
+
         except Exception as e:
             logger.error(f"Failed to snapshot balance: {e}")
         finally:
             self._schedule_midnight_snapshot()
+            self._schedule_performance_analysis()
+
+    async def _run_daily_performance_analysis(self):
+        """Run daily performance analysis at 00:01 UTC"""
+        try:
+            from performance_analysis.analyze_performance import BybitAPIClient, PerformanceAnalyzer, ReportGenerator
+            import pandas as pd
+
+            now = datetime.now(timezone.utc)
+            yesterday = now - timedelta(days=1)
+
+            start_ms = int(yesterday.replace(hour=0, minute=0, second=0, microsecond=0).timestamp() * 1000)
+            end_ms = int(yesterday.replace(hour=23, minute=59, second=59, microsecond=0).timestamp() * 1000)
+
+            # Fetch trades
+            api_client = BybitAPIClient()
+            closed_pnl = api_client.get_position_closed_pnl(start_time=start_ms, end_time=end_ms, limit=50)
+
+            if len(closed_pnl) > 0:
+                trades_df = pd.DataFrame(closed_pnl)
+                trades_df['closedPnl'] = pd.to_numeric(trades_df['closedPnl'])
+                trades_df = trades_df.rename(columns={'avgEntryPrice': 'entryPrice', 'avgExitPrice': 'exitPrice'})
+
+                analyzer = PerformanceAnalyzer(trades_df, initial_balance=10000)
+                metrics = analyzer.calculate_metrics()
+
+                report_gen = ReportGenerator(metrics, "Yesterday")
+                summary = report_gen.generate_text_summary()
+
+                send_telegram_message(f"📊 Daily Performance Analysis\n{summary}")
+            else:
+                send_telegram_message(f"📊 Daily Performance: No trades closed yesterday")
+
+            # Check if it's Monday for weekly analysis
+            if now.weekday() == 0:
+                await self._run_weekly_performance_analysis()
+
+            # Check if it's 1st of month for monthly analysis
+            if now.day == 1:
+                await self._run_monthly_performance_analysis()
+
+        except Exception as e:
+            logger.error(f"Failed to run daily performance analysis: {e}")
+            send_telegram_message(f"⚠️ Daily performance analysis failed: {e}")
+
+    async def _run_weekly_performance_analysis(self):
+        """Run weekly performance analysis every Monday"""
+        try:
+            from performance_analysis.analyze_performance import BybitAPIClient, PerformanceAnalyzer, ReportGenerator
+            import pandas as pd
+
+            now = datetime.now(timezone.utc)
+            week_ago = now - timedelta(days=7)
+
+            start_ms = int(week_ago.timestamp() * 1000)
+            end_ms = int(now.timestamp() * 1000)
+
+            api_client = BybitAPIClient()
+            closed_pnl = api_client.get_position_closed_pnl(start_time=start_ms, end_time=end_ms, limit=100)
+
+            if len(closed_pnl) > 0:
+                trades_df = pd.DataFrame(closed_pnl)
+                trades_df['closedPnl'] = pd.to_numeric(trades_df['closedPnl'])
+                trades_df = trades_df.rename(columns={'avgEntryPrice': 'entryPrice', 'avgExitPrice': 'exitPrice'})
+
+                analyzer = PerformanceAnalyzer(trades_df, initial_balance=10000)
+                metrics = analyzer.calculate_metrics()
+
+                report_gen = ReportGenerator(metrics, "Last Week")
+                summary = report_gen.generate_text_summary()
+
+                send_telegram_message(f"📊 Weekly Performance Analysis\n{summary}")
+            else:
+                send_telegram_message(f"📊 Weekly Performance: No trades closed last week")
+
+        except Exception as e:
+            logger.error(f"Failed to run weekly performance analysis: {e}")
+
+    async def _run_monthly_performance_analysis(self):
+        """Run monthly performance analysis on 1st of month"""
+        try:
+            from performance_analysis.analyze_performance import BybitAPIClient, PerformanceAnalyzer, ReportGenerator
+            import pandas as pd
+
+            now = datetime.now(timezone.utc)
+            month_ago = now - timedelta(days=30)
+
+            start_ms = int(month_ago.timestamp() * 1000)
+            end_ms = int(now.timestamp() * 1000)
+
+            api_client = BybitAPIClient()
+            closed_pnl = api_client.get_position_closed_pnl(start_time=start_ms, end_time=end_ms, limit=200)
+
+            if len(closed_pnl) > 0:
+                trades_df = pd.DataFrame(closed_pnl)
+                trades_df['closedPnl'] = pd.to_numeric(trades_df['closedPnl'])
+                trades_df = trades_df.rename(columns={'avgEntryPrice': 'entryPrice', 'avgExitPrice': 'exitPrice'})
+
+                analyzer = PerformanceAnalyzer(trades_df, initial_balance=10000)
+                metrics = analyzer.calculate_metrics()
+
+                report_gen = ReportGenerator(metrics, "Last Month")
+                summary = report_gen.generate_text_summary()
+
+                send_telegram_message(f"📊 Monthly Performance Analysis\n{summary}")
+            else:
+                send_telegram_message(f"📊 Monthly Performance: No trades closed last month")
+
+        except Exception as e:
+            logger.error(f"Failed to run monthly performance analysis: {e}")
 
     def get_account_balance(self) -> float:
         """
@@ -154,6 +317,91 @@ class RiskManager:
             return 0.0
         return retry_request(_fetch_pnl)
 
+    def get_current_equity(self) -> float:
+        """
+        Get current account equity (balance + unrealized PnL)
+        """
+        def _fetch_equity():
+            ts = fetch_server_timestamp()
+            params = {"coin": "USDT", "accountType": "UNIFIED"}
+            sig = generate_signature(ts, settings.RECV_WINDOW, params)
+            headers = {
+                'X-BAPI-API-KEY':     settings.API_KEY,
+                'X-BAPI-SIGN':        sig,
+                'X-BAPI-TIMESTAMP':   ts,
+                'X-BAPI-RECV-WINDOW': settings.RECV_WINDOW
+            }
+            resp = requests.get(
+                f"{settings.BASE_URL}/v5/account/wallet-balance",
+                headers=headers,
+                params=params
+            ).json()
+            if resp.get("retCode") != 0:
+                raise RuntimeError(f"Bybit error: {resp.get('retMsg')}")
+            for acct in resp["result"].get("list", []):
+                # Get totalEquity which includes unrealized PnL
+                total_equity = safe_float(acct.get("totalEquity", 0))
+                if total_equity > 0:
+                    return total_equity
+                # Fallback: calculate manually
+                for c in acct.get("coin", []):
+                    if c.get("coin") == "USDT":
+                        balance = safe_float(c.get("walletBalance", 0))
+                        unrealized = safe_float(c.get("unrealisedPnl", 0))
+                        return balance + unrealized
+            raise RuntimeError("USDT equity not found in wallet-balance response")
+        return retry_request(_fetch_equity)
+
+    def get_position_size_multiplier(self) -> float:
+        """
+        Get current position size multiplier based on weekly drawdown state
+        Returns: 1.0 for full size, 0.5 for half size, 0.0 for halted
+        """
+        # Check if daily circuit breaker is active
+        if self.daily_circuit_breaker_active:
+            return 0.0
+
+        # Check if weekly halt is active
+        if self.weekly_drawdown_level == 2:
+            return 0.0
+
+        # Return current multiplier (1.0 or 0.5)
+        return self.position_size_multiplier
+
+    def is_trading_allowed(self) -> Tuple[bool, str]:
+        """
+        Check if trading is currently allowed
+        Returns: (allowed: bool, reason: str)
+        """
+        now = datetime.now(timezone.utc)
+
+        # Check daily circuit breaker
+        if self.daily_circuit_breaker_active:
+            if self.daily_circuit_breaker_end_time and now < self.daily_circuit_breaker_end_time:
+                remaining = self.daily_circuit_breaker_end_time - now
+                hours = int(remaining.total_seconds() / 3600)
+                minutes = int((remaining.total_seconds() % 3600) / 60)
+                return False, f"⛔ Daily circuit breaker active. Trading resumes in {hours}h {minutes}m"
+            else:
+                # Circuit breaker expired
+                self.daily_circuit_breaker_active = False
+                self.daily_circuit_breaker_end_time = None
+
+        # Check weekly halt
+        if self.weekly_drawdown_level == 2:
+            if self.weekly_halt_end_time and now < self.weekly_halt_end_time:
+                remaining = self.weekly_halt_end_time - now
+                days = remaining.days
+                hours = int(remaining.seconds / 3600)
+                return False, f"⛔ Weekly halt active. Trading resumes in {days}d {hours}h (Monday 00:01 UTC)"
+            else:
+                # Weekly halt expired
+                self.weekly_drawdown_level = 0
+                self.position_size_multiplier = 1.0
+                self.weekly_halt_end_time = None
+
+        return True, "✅ Trading allowed"
+
     async def check_unrealized_drawdown(self):
         """
         Check intraday drawdown: arm at 2× base size, track peak, liquidate at 30% drawdown.
@@ -182,7 +430,7 @@ class RiskManager:
 
     async def check_daily_balance_drawdown(self):
         """
-        Check daily drawdown against midnight snapshot: liquidate at 25% drop.
+        Check daily drawdown against midnight snapshot: liquidate at 25% drop (LEGACY).
         """
         if self.daily_balance_ref is None:
             return
@@ -194,6 +442,134 @@ class RiskManager:
                 f"⚠️ Daily balance drop ≥25% ({drop*100:.1f}%) — liquidating all positions."
             )
             close_all_positions(self._get_active_trades())
+
+    async def check_equity_drawdowns(self):
+        """
+        Check equity-based drawdown triggers (daily and weekly)
+        """
+        try:
+            current_equity = self.get_current_equity()
+            now = datetime.now(timezone.utc)
+
+            # Initialize snapshots if not set
+            if self.daily_equity_start is None:
+                self.daily_equity_start = current_equity
+                print(f"📊 Initialized daily equity: ${current_equity:.2f}")
+
+            if self.weekly_equity_start is None:
+                self.weekly_equity_start = current_equity
+                self.weekly_equity_peak = current_equity
+                print(f"📊 Initialized weekly equity: ${current_equity:.2f}")
+
+            # ─── DAILY EQUITY DRAWDOWN (2% Circuit Breaker) ───────────────────────
+            daily_drawdown = (self.daily_equity_start - current_equity) / self.daily_equity_start
+
+            if daily_drawdown >= settings.DAILY_EQUITY_DRAWDOWN_THRESHOLD:
+                if not self.daily_circuit_breaker_active:
+                    # Trigger circuit breaker
+                    self.daily_circuit_breaker_active = True
+
+                    # Calculate pause end time (next day 00:01 UTC)
+                    tomorrow = datetime.combine(
+                        now.date() + timedelta(days=1),
+                        dtime(0, 1),
+                        tzinfo=timezone.utc
+                    )
+                    self.daily_circuit_breaker_end_time = tomorrow
+
+                    remaining = tomorrow - now
+                    hours = int(remaining.total_seconds() / 3600)
+                    minutes = int((remaining.total_seconds() % 3600) / 60)
+
+                    # Close all positions
+                    send_telegram_message(
+                        f"🚨 DAILY CIRCUIT BREAKER ACTIVATED\n\n"
+                        f"Daily equity drawdown: {daily_drawdown*100:.2f}%\n"
+                        f"Start equity: ${self.daily_equity_start:.2f}\n"
+                        f"Current equity: ${current_equity:.2f}\n\n"
+                        f"⛔ All positions closed\n"
+                        f"⛔ Trading paused until {tomorrow.strftime('%Y-%m-%d %H:%M UTC')}\n"
+                        f"⏱️ Countdown: {hours}h {minutes}m remaining"
+                    )
+                    close_all_positions(self._get_active_trades())
+                    print(f"🚨 Daily circuit breaker triggered at {daily_drawdown*100:.2f}% drawdown")
+
+            # ─── WEEKLY EQUITY DRAWDOWN (Progressive Risk Management) ─────────────
+            # Update weekly peak
+            if current_equity > self.weekly_equity_peak:
+                self.weekly_equity_peak = current_equity
+
+            weekly_drawdown = (self.weekly_equity_start - current_equity) / self.weekly_equity_start
+
+            # Level 2: 6% Weekly Drawdown (Halt Trading)
+            if weekly_drawdown >= settings.WEEKLY_EQUITY_DRAWDOWN_THRESHOLD_LEVEL2:
+                if self.weekly_drawdown_level < 2:
+                    self.weekly_drawdown_level = 2
+                    self.position_size_multiplier = 0.0
+
+                    # Calculate halt end time (next Monday 00:01 UTC)
+                    days_until_monday = (7 - now.weekday()) % 7
+                    if days_until_monday == 0:
+                        days_until_monday = 7
+                    next_monday = datetime.combine(
+                        now.date() + timedelta(days=days_until_monday),
+                        dtime(0, 1),
+                        tzinfo=timezone.utc
+                    )
+                    self.weekly_halt_end_time = next_monday
+
+                    remaining = next_monday - now
+                    days = remaining.days
+                    hours = int(remaining.seconds / 3600)
+
+                    send_telegram_message(
+                        f"🚨 WEEKLY TRADING HALT ACTIVATED\n\n"
+                        f"Weekly equity drawdown: {weekly_drawdown*100:.2f}%\n"
+                        f"Weekly start: ${self.weekly_equity_start:.2f}\n"
+                        f"Current equity: ${current_equity:.2f}\n\n"
+                        f"⛔ All positions closed\n"
+                        f"⛔ Trading halted until Monday {next_monday.strftime('%Y-%m-%d %H:%M UTC')}\n"
+                        f"⏱️ Countdown: {days}d {hours}h remaining"
+                    )
+                    close_all_positions(self._get_active_trades())
+                    print(f"🚨 Weekly halt triggered at {weekly_drawdown*100:.2f}% drawdown")
+
+            # Level 1: 4% Weekly Drawdown (Reduce Position Size)
+            elif weekly_drawdown >= settings.WEEKLY_EQUITY_DRAWDOWN_THRESHOLD_LEVEL1:
+                if self.weekly_drawdown_level < 1:
+                    self.weekly_drawdown_level = 1
+                    self.position_size_multiplier = settings.WEEKLY_POSITION_SIZE_REDUCTION
+
+                    send_telegram_message(
+                        f"⚠️ WEEKLY POSITION SIZE REDUCTION\n\n"
+                        f"Weekly equity drawdown: {weekly_drawdown*100:.2f}%\n"
+                        f"Weekly start: ${self.weekly_equity_start:.2f}\n"
+                        f"Current equity: ${current_equity:.2f}\n\n"
+                        f"📉 Position size reduced to {self.position_size_multiplier*100:.0f}%\n"
+                        f"🔄 Full size restores after 50% loss recovery"
+                    )
+                    print(f"⚠️ Position size reduced at {weekly_drawdown*100:.2f}% drawdown")
+
+                # Check for recovery (restore full position size)
+                elif self.weekly_drawdown_level == 1:
+                    max_weekly_loss = self.weekly_equity_start - current_equity
+                    recovery_target = self.weekly_equity_start - (max_weekly_loss * settings.WEEKLY_RECOVERY_THRESHOLD)
+
+                    if current_equity >= recovery_target:
+                        self.weekly_drawdown_level = 0
+                        self.position_size_multiplier = 1.0
+
+                        send_telegram_message(
+                            f"✅ POSITION SIZE RESTORED\n\n"
+                            f"Recovered 50%+ of weekly losses\n"
+                            f"Current equity: ${current_equity:.2f}\n"
+                            f"📈 Position size restored to 100%"
+                        )
+                        print(f"✅ Position size restored to 100%")
+
+        except Exception as e:
+            logger.error(f"Error checking equity drawdowns: {e}")
+            print(f"❌ Equity drawdown check failed: {e}")
 
     async def check_break_even(self):
         """

@@ -48,14 +48,22 @@ python main.py
 
 All documentation has been organized in the `docs/` directory:
 
-### 📋 Core Documentation
+### 📖 Essential Reading
+- **[System Architecture](docs/SYSTEM_ARCHITECTURE.md)** - Complete system overview and functionality guide
 - **[Project Structure](docs/PROJECT_STRUCTURE_CLEAN.md)** - Clean project organization
-- **[Logging & Configuration](docs/LOGGING_AND_CONFIGURATION.md)** - Comprehensive logging system
 - **[Breakeven & Closure System](docs/BREAKEVEN_AND_CLOSURE_SYSTEM.md)** - Enhanced trade management
 
-### 🔧 Setup & Integration
-- **[Trading Dashboard Setup](docs/trading_dashboard_setup.md)** - Dashboard configuration
-- **[Trading Integration Guide](docs/trading_integration_guide.md)** - Integration documentation
+### 📊 Performance Analysis
+- **[Performance Reports](docs/performance_reports/)** - Historical trading performance
+- Run analysis: `python performance_analysis/analyze_performance.py --period 1m --initial-balance 5000`
+
+### 🔬 Backtesting System (V2)
+- **[Backtesting Documentation](backtesting/v2/README.md)** - Comprehensive backtesting guide
+- Run backtest: `python backtesting/v2/scripts/run_backtest_v2.py`
+- Features: Modular architecture, YAML configuration, advanced analytics, performance reports
+
+### 🔧 Configuration & Setup
+- **[Logging & Configuration](docs/LOGGING_AND_CONFIGURATION.md)** - Comprehensive logging system
 - **[Restructure Guide](docs/RESTRUCTURE_GUIDE.md)** - Architecture overview
 
 ### 🛠️ Maintenance & Support
@@ -73,7 +81,10 @@ All documentation has been organized in the `docs/` directory:
 - **Trailing Stops**: Advanced exit strategies
 
 ### 🛡️ Risk Management
-- **Two-Tier Drawdown Protection**: Unrealized and daily balance limits
+- **[Equity-Based Drawdown System](docs/EQUITY_RISK_MANAGEMENT.md)** - Advanced protection layers
+- **Daily Circuit Breaker**: 2% equity drop triggers trading pause
+- **Weekly Progressive Protection**: 4% reduces position size, 6% halts trading
+- **Automated Performance Analysis**: Daily/weekly/monthly reports via Telegram
 - **8-Hour Negative PnL Rule**: Automatic closure of losing positions
 - **Position Reconciliation**: Sync with exchange positions
 - **Max Position Limits**: Configurable maximum active trades
@@ -89,22 +100,38 @@ All documentation has been organized in the `docs/` directory:
 - **Symbol-Level Restrictions**: Prevent overtrading
 - **Automatic Cleanup**: Memory management
 
-## 🏗️ Architecture
+## 🏗️ Project Structure
 
-### Modular Design
 ```
-src/
-├── core/          # Trading engine
-├── data/          # Market data & WebSocket
-├── trading/       # Trade execution
-├── utils/         # Utilities & helpers
-└── config/        # Configuration management
+cftprop/
+├── src/                        # Modular trading system
+│   ├── core/                   # Trading engine
+│   ├── data/                   # Market data & WebSocket
+│   ├── trading/                # Trade execution
+│   ├── utils/                  # Utilities & helpers
+│   └── config/                 # Configuration management
+├── backtesting/
+│   └── v2/                     # Advanced backtesting system
+│       ├── config/             # YAML configurations
+│       ├── scripts/            # Run scripts
+│       ├── analytics/          # Performance analytics
+│       └── reports/            # Backtest results
+├── performance_analysis/       # Live performance analysis
+├── docs/                       # Comprehensive documentation
+│   ├── EQUITY_RISK_MANAGEMENT.md
+│   ├── SYSTEM_ARCHITECTURE.md
+│   └── RISK_QUICK_REFERENCE.md
+├── logs/                       # Daily log files
+├── settings.py                 # Main configuration
+├── risk_manager.py             # Risk management system
+├── main.py                     # Legacy entry point
+└── docker-compose.yml.disabled # Docker config (use unified compose)
 ```
 
-### Legacy Compatibility
-- Original files maintained for compatibility
-- Gradual migration to modular architecture
-- Backward compatibility preserved
+### Notes
+- `backtesting_backup/` and `original_backup/` preserved for reference
+- Docker Compose disabled - use unified deployment configuration
+- Backtesting V1 removed - use V2 only
 
 ## ⚙️ Configuration
 

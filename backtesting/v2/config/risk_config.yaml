@@ -1,0 +1,279 @@
+# Backtesting V2 - Risk Management Configuration
+# This file contains all risk management parameters
+
+# =============================================================================
+# POSITION LIMITS
+# =============================================================================
+position_limits:
+  # Maximum positions
+  max_active_trades: 30       # Maximum non-breakeven positions
+  max_breakeven_trades: null  # No limit on breakeven positions
+
+  # Per-symbol limits
+  max_positions_per_symbol: 1  # Only 1 position per symbol (but can pyramid to it)
+
+  # Concentration limits
+  max_exposure_per_symbol_pct: null  # No limit (pyramiding allowed)
+  max_sector_exposure_pct: null      # No sector limits
+
+# =============================================================================
+# CAPITAL MANAGEMENT
+# =============================================================================
+capital_management:
+  # Available capital
+  reserve_capital_pct: 0.0    # No capital reserve (use all for trading)
+  min_free_capital: 200.0     # Minimum $200 free to open new position
+
+  # Capital allocation
+  allocation_method: "equal"   # Equal size for all entries
+  rebalance_on_pnl: false     # Don't rebalance based on P&L
+
+# =============================================================================
+# DRAWDOWN CONTROLS (Future Enhancement)
+# =============================================================================
+drawdown_controls:
+  # Drawdown-based position size reduction
+  enabled: false              # Not enabled yet
+
+  # Drawdown tiers (for future optimization testing)
+  tiers:
+    tier_1:
+      drawdown_threshold_pct: -3.0
+      position_size_multiplier: 0.75
+      max_active_trades_override: null
+
+    tier_2:
+      drawdown_threshold_pct: -4.0
+      position_size_multiplier: 0.50
+      max_active_trades_override: 15
+
+    tier_3:
+      drawdown_threshold_pct: -5.0
+      position_size_multiplier: 0.0  # Circuit breaker
+      max_active_trades_override: 0
+      close_all_positions: true
+
+  # Drawdown calculation
+  drawdown_reference: "daily_high"  # "daily_high", "initial_balance", "running_max"
+  drawdown_update_frequency: "every_trade"
+
+# =============================================================================
+# STOP LOSS MANAGEMENT
+# =============================================================================
+stop_loss_management:
+  # Stop loss type
+  type: "percentage"          # "percentage", "atr", "fixed_dollar"
+  percentage: 8.0             # -8% from average entry
+
+  # Stop loss updates
+  update_on_pyramid: true     # Update SL to new average entry when pyramiding
+  never_widen: true           # Never move SL further from entry
+
+  # Breakeven stop loss
+  breakeven_stop:
+    enabled: true
+    trigger_profit_pct: 8.0   # Move to breakeven at +8%
+    buffer_pct: 0.02          # 0.02% above entry (covers ~0.055% commission × 2)
+    lock_in_profit: false     # Don't lock in profit, just protect capital
+
+# =============================================================================
+# TAKE PROFIT MANAGEMENT
+# =============================================================================
+take_profit_management:
+  # Take profit type
+  type: "percentage"          # "percentage", "atr", "fixed_dollar"
+  percentage: 30.0            # +30% from FIRST entry
+
+  # Take profit updates
+  update_on_pyramid: false    # CRITICAL: TP stays at original target
+  use_trailing: false         # No trailing take profit
+
+  # Partial exits (future)
+  partial_exits:
+    enabled: false
+    levels:
+      - profit_pct: 15.0
+        close_pct: 33.0       # Close 33% at +15%
+      - profit_pct: 20.0
+        close_pct: 33.0       # Close 33% at +20%
+      # Remaining 34% runs to full TP at 30%
+
+# =============================================================================
+# TIME-BASED RISK CONTROLS
+# =============================================================================
+time_based_controls:
+  # Negative PnL timeout
+  negative_pnl_timeout:
+    enabled: true
+    hours: 8                  # Close if negative after 8 hours
+    check_frequency_minutes: 5  # Check every 5 min (every candle)
+
+  # Maximum trade duration
+  max_trade_duration:
+    enabled: true
+    hours: 72                 # Force close after 72 hours
+    close_regardless_of_pnl: true
+
+  # Intraday resets (future)
+  intraday_resets:
+    enabled: false
+    reset_hour_utc: 0         # Reset at midnight UTC
+
+# =============================================================================
+# PRE-TRADE RISK CHECKS
+# =============================================================================
+pre_trade_checks:
+  # Capital checks
+  check_available_capital: true
+  min_capital_for_trade: 200.0
+
+  # Position limit checks
+  check_max_positions: true
+  check_symbol_limits: true
+
+  # Cooldown checks
+  check_symbol_cooldown: true
+
+  # Universe checks
+  check_symbol_in_universe: true
+
+  # Data quality checks
+  check_data_availability: true
+  check_indicator_validity: true
+
+# =============================================================================
+# ACTIVE POSITION MONITORING
+# =============================================================================
+active_position_monitoring:
+  # Update frequency
+  check_frequency: "every_candle"  # Check positions every candle
+
+  # What to monitor
+  monitors:
+    - "stop_loss"             # Check if SL hit
+    - "take_profit"           # Check if TP hit
+    - "breakeven_trigger"     # Check if should move to breakeven
+    - "time_exits"            # Check time-based exits
+    - "drawdown"              # Monitor position drawdown
+
+  # Action priority
+  action_priority:
+    - "stop_loss"             # Highest priority
+    - "take_profit"
+    - "time_exit"
+    - "breakeven_move"
+
+# =============================================================================
+# PORTFOLIO-LEVEL RISK
+# =============================================================================
+portfolio_risk:
+  # Correlation limits (future)
+  max_correlation: null       # No correlation limit
+  check_correlation: false
+
+  # Sector concentration (future)
+  max_sector_pct: null        # No sector limits
+  sector_definitions: {}
+
+  # Portfolio heat (future)
+  max_portfolio_heat: null    # No heat limit
+  heat_calculation: null
+
+# =============================================================================
+# CIRCUIT BREAKERS
+# =============================================================================
+circuit_breakers:
+  # Daily loss limit (future)
+  daily_loss_limit:
+    enabled: false
+    max_loss_pct: null        # No daily loss limit
+    max_loss_usd: null
+    action: "stop_trading"    # or "reduce_size", "close_all"
+
+  # Rapid drawdown protection (future)
+  rapid_drawdown:
+    enabled: false
+    max_drawdown_pct: null
+    within_minutes: null
+    action: "stop_trading"
+
+  # Consecutive losses (future)
+  consecutive_losses:
+    enabled: false
+    max_consecutive: null
+    action: "reduce_size"
+
+# =============================================================================
+# COMMISSION & SLIPPAGE
+# =============================================================================
+costs:
+  # Commission
+  commission:
+    type: "percentage"        # "percentage", "fixed", "tiered"
+    rate: 0.055               # 0.055% per side (Bybit taker)
+    applies_to: "both"        # Entry and exit
+
+  # Slippage (future)
+  slippage:
+    enabled: false
+    base_bps: 0.0             # Base slippage in basis points
+    volatility_multiplier: 0.0
+    method: "fixed"           # "fixed", "dynamic", "spread_based"
+
+# =============================================================================
+# RISK REPORTING
+# =============================================================================
+reporting:
+  # Metrics to track
+  track_metrics:
+    - "max_drawdown"
+    - "sharpe_ratio"
+    - "sortino_ratio"
+    - "max_concurrent_positions"
+    - "avg_position_duration"
+    - "largest_win"
+    - "largest_loss"
+    - "win_rate"
+    - "profit_factor"
+
+  # Risk alerts (for future real-time monitoring)
+  alerts:
+    enabled: false
+    alert_on_max_drawdown: false
+    alert_on_consecutive_losses: false
+    alert_on_low_capital: false
+
+# =============================================================================
+# VALIDATION & SAFETY
+# =============================================================================
+validation:
+  # Pre-backtest validation
+  validate_config: true       # Validate config before running
+  validate_data: true         # Validate data quality
+  validate_indicators: true   # Validate indicator calculations
+
+  # Safety checks
+  safety_checks:
+    check_negative_balance: true
+    check_impossible_prices: true
+    check_data_gaps: true
+
+  # Fail behavior
+  fail_on_error: false        # Continue even with errors
+  log_warnings: true          # Log all warnings
+
+# =============================================================================
+# METADATA
+# =============================================================================
+metadata:
+  config_version: "2.0"
+  created_date: "2025-10-17"
+  description: "Risk management configuration for Pump Chaser V2"
+  author: "CFT Prop Trading Bot"
+
+  notes:
+    - "Breakeven positions don't count toward max_active_trades"
+    - "Stop loss updates to average entry when pyramiding"
+    - "Take profit NEVER updates (stays at original entry target)"
+    - "Commission is 0.055% per side (0.11% round trip)"
+    - "Drawdown controls are disabled (for future optimization)"

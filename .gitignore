@@ -70,21 +70,36 @@ temp/
 # But ignore backup logs
 trade_log_*.json
 
-# Backups (but keep original_backup/ folder)
-backups/
+# Backups (but keep backup folders for reference)
 *.backup
 
 # Node modules (if any)
 node_modules/
 
-# Docker
-.dockerignore
+# Docker (disabled local compose, use unified)
+docker-compose.yml.disabled
 
-# Keep important files - explicitly include
+# Backtesting outputs
+backtesting/v2/results/*.json
+backtesting/v2/reports/*.txt
+backtesting/v2/data/cache/
+
+# Performance analysis outputs (keep JSON metadata, ignore large files)
+docs/performance_reports/*.pdf
+docs/*.png
+
+# Keep important folders and files
 !original_backup/
+!backtesting_backup/
 !requirements.txt
+
+# Keep all markdown documentation
 !README.md
-!OPTIMIZATION_SUMMARY.md
-!FIXES_APPLIED.md
-!ISSUE_RESOLUTION.md
+!*.md
+!docs/*.md
+!backtesting/v2/*.md
+
+# Keep essential config and data files
 !trade_log.json
+!settings.py
+!.env.example

@@ -82,6 +82,7 @@ class CFTPropBot:
         self.monitor_tasks = [
             asyncio.create_task(self._balance_monitor()),
             asyncio.create_task(self._pnl_monitor()),
+            asyncio.create_task(self._equity_drawdown_monitor()),  # NEW: Equity-based drawdown
             asyncio.create_task(self._breakeven_monitor()),
             asyncio.create_task(self._watchdog_monitor()),
             asyncio.create_task(self._market_diagnostic_monitor()),
@@ -124,6 +125,15 @@ class CFTPropBot:
                 await self.risk_manager.check_unrealized_drawdown()
             except Exception as e:
                 print(f"⚠️ PnL monitor error: {e}")
+
+    async def _equity_drawdown_monitor(self):
+        """Monitor equity-based drawdowns (daily 2%, weekly 4%/6%)"""
+        while True:
+            await asyncio.sleep(settings.EQUITY_DRAWDOWN_CHECK_INTERVAL)
+            try:
+                await self.risk_manager.check_equity_drawdowns()
+            except Exception as e:
+                print(f"⚠️ Equity drawdown monitor error: {e}")
     
     async def _breakeven_monitor(self):
         """Monitor breakeven conditions"""

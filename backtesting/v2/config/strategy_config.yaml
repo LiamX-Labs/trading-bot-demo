@@ -1,0 +1,290 @@
+# Backtesting V2 - Strategy Configuration
+# This file contains all trading strategy parameters
+
+# =============================================================================
+# ENTRY SIGNAL REQUIREMENTS
+# =============================================================================
+entry:
+  # Pump detection (REQUIRED before any rule check)
+  pump_detection:
+    enabled: true             # MUST be true for live system accuracy
+    lookback_periods: 12      # Number of bars (1 hour on 5-min timeframe)
+    threshold_pct: 8.0        # Required pump percentage (8%)
+    method: "close_to_close"  # "open_to_close" or "close_to_close"
+
+  # Rule priority
+  rule_priority:
+    - "Rule 8"                # Check Rule 8 first (higher priority)
+    - "Rule 6"                # Check Rule 6 second
+
+  # Signal generation
+  max_signals_per_symbol_per_bar: 1  # Maximum 1 signal per symbol per candle
+
+# =============================================================================
+# TECHNICAL INDICATORS
+# =============================================================================
+indicators:
+  # RSI (Relative Strength Index)
+  rsi:
+    period: 84                # 7 hours (84 × 5-minute bars)
+    method: "wilder"          # Wilder's smoothing method
+    overbought: 70            # Overbought threshold (reference only)
+    oversold: 30              # Oversold threshold (reference only)
+
+  # Volatility (Rolling Standard Deviation)
+  volatility:
+    period: 144               # 12 hours (144 × 5-minute bars)
+    method: "returns_std"     # Standard deviation of returns
+    annualize: false          # Don't annualize (use raw values)
+
+  # Price spread (intra-candle range)
+  spread:
+    method: "high_low_pct"    # (high - low) / close × 100
+    # No period needed (calculated per candle)
+
+  # Volume change
+  volume_change:
+    period: 144               # 12 hours lookback
+    method: "pct_change"      # Percentage change
+
+  # Price change
+  price_change:
+    period: 144               # 12 hours lookback
+    method: "pct_change"      # Percentage change
+
+# =============================================================================
+# RULE 6: RSI + Volatility
+# =============================================================================
+rule_6:
+  enabled: true
+  name: "RSI + Volatility Momentum"
+  description: "Simple RSI strength + volatility filter"
+
+  # Entry conditions (ALL must be true)
+  conditions:
+    rsi_threshold: 55.0       # RSI > 55
+    volatility_threshold: 0.008  # Volatility > 0.008
+
+  # Side
+  side: "Buy"                 # Long only
+
+  # Additional filters (optional)
+  filters:
+    min_volume_24h: null      # Already filtered by universe
+    max_spread: null          # No max spread for Rule 6
+
+# =============================================================================
+# RULE 8: Composite Score
+# =============================================================================
+rule_8:
+  enabled: true
+  name: "Composite Momentum Score"
+  description: "Multi-factor score-based entry"
+
+  # Composite score components (each worth 1 point)
+  score_components:
+    rsi_strength:
+      enabled: true
+      threshold: 60           # RSI > 60 = +1 point
+      weight: 1
+
+    volume_surge:
+      enabled: true
+      threshold: 50           # Volume change > 50% = +1 point
+      weight: 1
+
+    tight_spread:
+      enabled: true
+      threshold: 3            # Spread < 3% = +1 point
+      weight: 1
+
+    volatility_present:
+      enabled: true
+      threshold: 0.005        # Volatility > 0.005 = +1 point
+      weight: 1
+
+    price_momentum:
+      enabled: true
+      threshold: 5            # Price change > 5% = +1 point
+      weight: 1
+
+  # Entry conditions
+  conditions:
+    min_score: 2              # Composite score >= 2
+    max_spread: 4.0           # Spread < 4%
+
+  # Side
+  side: "Buy"                 # Long only
+
+# =============================================================================
+# EXIT LOGIC
+# =============================================================================
+exits:
+  # Exit priority (checked in this order)
+  # 1. Stop Loss
+  # 2. Take Profit
+  # 3. Time-based exits
+
+  # Stop Loss
+  stop_loss:
+    enabled: true
+    type: "percentage"        # "percentage", "atr", "fixed"
+    percentage: 8.0           # -8% from average entry price
+
+    # Breakeven stop loss
+    breakeven:
+      enabled: true
+      trigger_pct: 8.0        # Move to breakeven at +8% profit
+      buffer_pct: 0.02        # 0.02% above entry (covers commission)
+
+  # Take Profit
+  take_profit:
+    enabled: true
+    type: "percentage"        # "percentage", "atr", "fixed"
+    percentage: 30.0          # +30% from FIRST entry price
+
+    # Important: TP stays at original entry target, does NOT update with pyramiding
+    update_with_pyramid: false
+
+  # Time-based exits
+  time_based:
+    # Negative PnL exit
+    negative_pnl_exit:
+      enabled: true
+      hours: 8                # Close if negative after 8 hours
+      check_frequency_min: 5  # Check every 5 minutes (every candle)
+
+    # Maximum trade age
+    max_age_exit:
+      enabled: true
+      hours: 72               # Force close after 72 hours (3 days)
+      regardless_of_pnl: true  # Close even if profitable
+
+  # Exit using OHLC data
+  use_ohlc_exits: true        # Use high/low for intra-candle simulation
+  # Stop loss checks candle LOW
+  # Take profit checks candle HIGH
+
+# =============================================================================
+# POSITION MANAGEMENT
+# =============================================================================
+position_management:
+  # Breakeven tracking
+  breakeven:
+    enabled: true
+    frees_up_slot: true       # Breakeven positions don't count toward max_active_trades
+
+  # Position updates
+  update_frequency: "every_candle"  # Update positions every candle
+
+  # Exit check frequency
+  exit_check_frequency: "every_candle"  # Check exits every candle
+
+# =============================================================================
+# RISK MANAGEMENT
+# =============================================================================
+risk:
+  # Position sizing
+  position_sizing:
+    method: "fixed"           # "fixed", "percentage", "volatility_adjusted"
+    fixed_size_usd: 200.0     # Fixed $200 per entry
+
+  # Risk limits (global)
+  global_limits:
+    max_total_exposure: null  # No limit (controlled by max_active_trades)
+    max_loss_per_day: null    # No daily loss limit
+    max_drawdown: null        # No max drawdown limit (yet)
+
+  # Per-position limits
+  position_limits:
+    max_position_size: null   # No limit per position
+    max_entries_per_position: 999  # Unlimited pyramiding
+
+# =============================================================================
+# SIGNAL QUALITY FILTERS (Future Enhancement)
+# =============================================================================
+signal_quality:
+  # Confidence scoring (optional)
+  enabled: false
+  min_confidence: 0.0         # Minimum confidence score (0-1)
+
+  # Additional filters
+  filters:
+    min_volume_ratio: null    # Minimum volume vs average
+    max_spread_percentile: null  # Maximum spread percentile
+    min_liquidity: null       # Minimum order book depth
+
+# =============================================================================
+# REGIME-BASED RULES (Future Enhancement)
+# =============================================================================
+regime_based:
+  enabled: false
+
+  # Different rules for different market regimes
+  regimes:
+    bull:
+      enabled_rules: ["Rule 6", "Rule 8"]
+      position_size_multiplier: 1.0
+
+    bear:
+      enabled_rules: []       # No trading in bear market
+      position_size_multiplier: 0.0
+
+    sideways:
+      enabled_rules: ["Rule 8"]
+      position_size_multiplier: 0.75
+
+# =============================================================================
+# OPTIMIZATION PARAMETERS (Future Enhancement)
+# =============================================================================
+optimization:
+  # Parameters to optimize
+  parameters:
+    - name: "pump_threshold_pct"
+      min: 5.0
+      max: 12.0
+      step: 1.0
+      current: 8.0
+
+    - name: "rule_8_min_score"
+      min: 1
+      max: 4
+      step: 1
+      current: 2
+
+    - name: "stop_loss_pct"
+      min: 5.0
+      max: 10.0
+      step: 1.0
+      current: 8.0
+
+    - name: "take_profit_pct"
+      min: 20.0
+      max: 40.0
+      step: 5.0
+      current: 30.0
+
+    - name: "max_active_trades"
+      min: 10
+      max: 50
+      step: 10
+      current: 30
+
+# =============================================================================
+# METADATA
+# =============================================================================
+metadata:
+  config_version: "2.0"
+  created_date: "2025-10-17"
+  description: "Trading strategy configuration matching live system (Rule 6 & Rule 8)"
+  author: "CFT Prop Trading Bot"
+  live_system_version: "production"
+
+  # Important notes
+  notes:
+    - "Only Rule 6 and Rule 8 are enabled (matches live system)"
+    - "8% pump detection is REQUIRED before any rule check"
+    - "Pyramiding is core feature - multiple entries per symbol allowed"
+    - "Breakeven at +8% profit frees up position slot"
+    - "Take profit stays at original entry target (+30% from first entry)"
+    - "Stop loss updates to average entry price with each pyramid"

@@ -1,0 +1,48 @@
+services:
+  trading-bot:
+    build: .
+    env_file:
+      - .env
+    restart: unless-stopped
+    volumes:
+      - .:/app
+    command: ["python", "main.py"]
+    # ADDED: Logging configuration for AWS free tier
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    # ADDED: Memory limit for t2.micro
+    mem_limit: 900m
+    mem_reservation: 700m
+    # Better network handling
+    sysctls:
+      - net.ipv4.tcp_keepalive_time=120
+      - net.ipv4.tcp_keepalive_intvl=30
+      - net.ipv4.tcp_keepalive_probes=5
+
+  alt-algoprop:
+    build:
+      context: .
+      dockerfile: AltAlgoprop
+    env_file:
+      - .env
+    restart: unless-stopped
+    volumes:
+      - .:/app
+    command: ["python", "main.py"]
+    # ADDED: Logging configuration for AWS free tier
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    # ADDED: Memory limit for t2.micro
+    mem_limit: 900m
+    mem_reservation: 700m
+    # Better network handling
+    sysctls:
+      - net.ipv4.tcp_keepalive_time=120
+      - net.ipv4.tcp_keepalive_intvl=30
+      - net.ipv4.tcp_keepalive_probes=5
