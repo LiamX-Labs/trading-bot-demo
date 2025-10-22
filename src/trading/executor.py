@@ -227,14 +227,28 @@ class TradeExecutor:
         except Exception:
             return False
     
-    async def open_trade_async(self, symbol: str, side: str, price: float, rule_id: str) -> Optional[Dict]:
+    async def open_trade_async(self, symbol: str, side: str, price: float, rule_id: str, position_size_multiplier: float = 1.0) -> Optional[Dict]:
         """Open a complete trade asynchronously with parallel execution"""
+        # Get market info for position size adjustment
+        info = await self.fetch_market_info_async(symbol)
+        if not info:
+            return None
+
         # Calculate order parameters
         order_params = await self.calculate_order_params_async(symbol, price)
         if not order_params or order_params[0] is None:
             return None
-        
+
         qty, sl_price, tp_price, act_price, trail_offset = order_params
+
+        # Apply position size multiplier (for weekly drawdown protection)
+        if position_size_multiplier < 1.0:
+            qty_step = float(info['lotSizeFilter']['qtyStep'])
+            qty = math.floor((qty * position_size_multiplier) / qty_step) * qty_step
+            min_qty = float(info['lotSizeFilter']['minOrderQty'])
+            if qty < min_qty:
+                print(f"⚠️ Reduced position size below minimum for {symbol}, using minimum")
+                qty = min_qty
         
         # Capture entry timestamp
         entry_timestamp = datetime.now(timezone.utc)
@@ -272,12 +286,12 @@ class TradeExecutor:
         
         print(f"⚠️ Warning: Failed to set trading stops for {symbol} after {max_retries} attempts")
     
-    def open_trade(self, symbol: str, side: str, price: float, rule_id: str) -> Optional[Dict]:
+    def open_trade(self, symbol: str, side: str, price: float, rule_id: str, position_size_multiplier: float = 1.0) -> Optional[Dict]:
         """Synchronous wrapper for backward compatibility - uses sync methods"""
         # Fallback to synchronous implementation for compatibility
-        return self._open_trade_sync(symbol, side, price, rule_id)
-    
-    def _open_trade_sync(self, symbol: str, side: str, price: float, rule_id: str) -> Optional[Dict]:
+        return self._open_trade_sync(symbol, side, price, rule_id, position_size_multiplier)
+
+    def _open_trade_sync(self, symbol: str, side: str, price: float, rule_id: str, position_size_multiplier: float = 1.0) -> Optional[Dict]:
         """Synchronous implementation for compatibility"""
         # Get market info synchronously
         info = self._fetch_market_info_sync(symbol)
@@ -288,12 +302,21 @@ class TradeExecutor:
         order_params = self._calculate_order_params_sync(info, price)
         if not order_params or order_params[0] is None:
             return None
-        
+
         qty, sl_price, tp_price, act_price, trail_offset = order_params
-        
+
+        # Apply position size multiplier (for weekly drawdown protection)
+        if position_size_multiplier < 1.0:
+            qty_step = float(info['lotSizeFilter']['qtyStep'])
+            qty = math.floor((qty * position_size_multiplier) / qty_step) * qty_step
+            min_qty = float(info['lotSizeFilter']['minOrderQty'])
+            if qty < min_qty:
+                print(f"⚠️ Reduced position size below minimum for {symbol}, using minimum")
+                qty = min_qty
+
         # Capture entry timestamp
         entry_timestamp = datetime.now(timezone.utc)
-        
+
         # Execute market order synchronously
         order_result = self._execute_market_order_sync(symbol, side, qty)
         if order_result.get("retCode") != 0:
