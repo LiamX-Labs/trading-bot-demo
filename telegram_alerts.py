@@ -132,46 +132,71 @@ class TelegramBatchNotifier:
 # Global batch notifier instance
 batch_notifier = TelegramBatchNotifier()
 
-def send_telegram_message(msg: str, batch_startup=False):
-    """Send Telegram message with rate limiting"""
+def send_telegram_message(msg: str, batch_startup=False, max_retries=3):
+    """Send Telegram message with rate limiting and retry logic"""
     global last_message_time
-    
+
     # Rate limiting: ensure minimum interval between messages
     current_time = time.time()
     time_since_last = current_time - last_message_time
-    
+
     if time_since_last < MIN_MESSAGE_INTERVAL:
         sleep_time = MIN_MESSAGE_INTERVAL - time_since_last
         time.sleep(sleep_time)
-    
+
     url = f"{BASE_URL}/sendMessage"
     payload = {
         "chat_id": CHAT_ID,
         "text": msg,
         "parse_mode": "Markdown",
     }
-    
-    try:
-        res = requests.post(url, json=payload, timeout=10)
-        res.raise_for_status()
-        last_message_time = time.time()
-        print(f"✅ Sent: {msg}")
-    except requests.exceptions.HTTPError as e:
-        if e.response.status_code == 429:
-            # Rate limited - wait and retry once
-            print(f"⚠️ Telegram rate limited, waiting 2 seconds...")
-            time.sleep(2)
-            try:
-                res = requests.post(url, json=payload, timeout=10)
-                res.raise_for_status()
-                last_message_time = time.time()
-                print(f"✅ Sent (retry): {msg}")
-            except Exception as retry_e:
-                print(f"❌ Telegram retry failed: {retry_e}")
-        else:
-            print(f"❌ Telegram HTTP error: {e}")
-    except requests.exceptions.RequestException as e:
-        print(f"❌ Telegram error: {e}")
+
+    for attempt in range(max_retries):
+        try:
+            res = requests.post(url, json=payload, timeout=10)
+            res.raise_for_status()
+            last_message_time = time.time()
+            if attempt > 0:
+                print(f"✅ Telegram sent (attempt {attempt + 1})")
+            return True
+
+        except requests.exceptions.HTTPError as e:
+            if e.response.status_code == 429:
+                # Rate limited - exponential backoff
+                wait_time = 2 ** attempt
+                print(f"⚠️ Telegram rate limited, waiting {wait_time}s... (attempt {attempt + 1}/{max_retries})")
+                time.sleep(wait_time)
+                continue
+            else:
+                print(f"❌ Telegram HTTP error {e.response.status_code}: {e}")
+                if attempt < max_retries - 1:
+                    time.sleep(1)
+                    continue
+                return False
+
+        except requests.exceptions.ConnectionError as e:
+            print(f"⚠️ Telegram connection error (attempt {attempt + 1}/{max_retries}): Network unreachable")
+            if attempt < max_retries - 1:
+                time.sleep(2 ** attempt)  # Exponential backoff
+                continue
+            return False
+
+        except requests.exceptions.Timeout as e:
+            print(f"⚠️ Telegram timeout (attempt {attempt + 1}/{max_retries})")
+            if attempt < max_retries - 1:
+                time.sleep(1)
+                continue
+            return False
+
+        except requests.exceptions.RequestException as e:
+            print(f"❌ Telegram error (attempt {attempt + 1}/{max_retries}): {e}")
+            if attempt < max_retries - 1:
+                time.sleep(1)
+                continue
+            return False
+
+    print(f"❌ Failed to send Telegram message after {max_retries} attempts")
+    return False
 
 async def send_telegram_message_async(msg: str):
     """Async version for use in async contexts"""
