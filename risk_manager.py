@@ -170,7 +170,10 @@ class RiskManager:
 
             if len(closed_pnl) > 0:
                 trades_df = pd.DataFrame(closed_pnl)
+                # Convert numeric fields to avoid type errors
                 trades_df['closedPnl'] = pd.to_numeric(trades_df['closedPnl'])
+                trades_df['createdTime'] = pd.to_numeric(trades_df['createdTime'])
+                trades_df['updatedTime'] = pd.to_numeric(trades_df['updatedTime'])
                 trades_df = trades_df.rename(columns={'avgEntryPrice': 'entryPrice', 'avgExitPrice': 'exitPrice'})
 
                 analyzer = PerformanceAnalyzer(trades_df, initial_balance=10000)
@@ -179,9 +182,15 @@ class RiskManager:
                 report_gen = ReportGenerator(metrics, "Yesterday")
                 summary = report_gen.generate_text_summary()
 
-                send_telegram_message(f"📊 Daily Performance Analysis\n{summary}")
+                try:
+                    send_telegram_message(f"📊 Daily Performance Analysis\n{summary}")
+                except Exception as tg_error:
+                    logger.warning(f"Telegram notification failed: {tg_error}")
             else:
-                send_telegram_message(f"📊 Daily Performance: No trades closed yesterday")
+                try:
+                    send_telegram_message(f"📊 Daily Performance: No trades closed yesterday")
+                except Exception as tg_error:
+                    logger.warning(f"Telegram notification failed: {tg_error}")
 
             # Check if it's Monday for weekly analysis
             if now.weekday() == 0:
@@ -212,7 +221,10 @@ class RiskManager:
 
             if len(closed_pnl) > 0:
                 trades_df = pd.DataFrame(closed_pnl)
+                # Convert numeric fields to avoid type errors
                 trades_df['closedPnl'] = pd.to_numeric(trades_df['closedPnl'])
+                trades_df['createdTime'] = pd.to_numeric(trades_df['createdTime'])
+                trades_df['updatedTime'] = pd.to_numeric(trades_df['updatedTime'])
                 trades_df = trades_df.rename(columns={'avgEntryPrice': 'entryPrice', 'avgExitPrice': 'exitPrice'})
 
                 analyzer = PerformanceAnalyzer(trades_df, initial_balance=10000)
@@ -221,9 +233,15 @@ class RiskManager:
                 report_gen = ReportGenerator(metrics, "Last Week")
                 summary = report_gen.generate_text_summary()
 
-                send_telegram_message(f"📊 Weekly Performance Analysis\n{summary}")
+                try:
+                    send_telegram_message(f"📊 Weekly Performance Analysis\n{summary}")
+                except Exception as tg_error:
+                    logger.warning(f"Telegram notification failed: {tg_error}")
             else:
-                send_telegram_message(f"📊 Weekly Performance: No trades closed last week")
+                try:
+                    send_telegram_message(f"📊 Weekly Performance: No trades closed last week")
+                except Exception as tg_error:
+                    logger.warning(f"Telegram notification failed: {tg_error}")
 
         except Exception as e:
             logger.error(f"Failed to run weekly performance analysis: {e}")
@@ -245,7 +263,10 @@ class RiskManager:
 
             if len(closed_pnl) > 0:
                 trades_df = pd.DataFrame(closed_pnl)
+                # Convert numeric fields to avoid type errors
                 trades_df['closedPnl'] = pd.to_numeric(trades_df['closedPnl'])
+                trades_df['createdTime'] = pd.to_numeric(trades_df['createdTime'])
+                trades_df['updatedTime'] = pd.to_numeric(trades_df['updatedTime'])
                 trades_df = trades_df.rename(columns={'avgEntryPrice': 'entryPrice', 'avgExitPrice': 'exitPrice'})
 
                 analyzer = PerformanceAnalyzer(trades_df, initial_balance=10000)
@@ -254,9 +275,15 @@ class RiskManager:
                 report_gen = ReportGenerator(metrics, "Last Month")
                 summary = report_gen.generate_text_summary()
 
-                send_telegram_message(f"📊 Monthly Performance Analysis\n{summary}")
+                try:
+                    send_telegram_message(f"📊 Monthly Performance Analysis\n{summary}")
+                except Exception as tg_error:
+                    logger.warning(f"Telegram notification failed: {tg_error}")
             else:
-                send_telegram_message(f"📊 Monthly Performance: No trades closed last month")
+                try:
+                    send_telegram_message(f"📊 Monthly Performance: No trades closed last month")
+                except Exception as tg_error:
+                    logger.warning(f"Telegram notification failed: {tg_error}")
 
         except Exception as e:
             logger.error(f"Failed to run monthly performance analysis: {e}")
