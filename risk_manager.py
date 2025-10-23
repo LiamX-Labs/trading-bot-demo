@@ -73,6 +73,7 @@ class RiskManager:
         self.weekly_drawdown_level = 0  # 0=normal, 1=4% (reduced size), 2=6% (halted)
         self.weekly_halt_end_time = None
         self.position_size_multiplier = 1.0  # 1.0=full size, 0.5=half size
+        self.weekly_max_drawdown = 0.0  # Track peak drawdown amount for recovery calculation
 
         # Initialize equity snapshots
         if enable_snapshot:
@@ -568,20 +569,29 @@ class RiskManager:
                     self.weekly_drawdown_level = 1
                     self.position_size_multiplier = settings.WEEKLY_POSITION_SIZE_REDUCTION
 
+                    # Store the peak drawdown amount for recovery calculation
+                    self.weekly_max_drawdown = self.weekly_equity_start - current_equity
+
                     send_telegram_message(
                         f"⚠️ WEEKLY POSITION SIZE REDUCTION\n\n"
                         f"Weekly equity drawdown: {weekly_drawdown*100:.2f}%\n"
                         f"Weekly start: ${self.weekly_equity_start:.2f}\n"
-                        f"Current equity: ${current_equity:.2f}\n\n"
+                        f"Current equity: ${current_equity:.2f}\n"
+                        f"Loss amount: ${self.weekly_max_drawdown:.2f}\n\n"
                         f"📉 Position size reduced to {self.position_size_multiplier*100:.0f}%\n"
-                        f"🔄 Full size restores after 50% loss recovery"
+                        f"🔄 Full size restores after 50% loss recovery (${self.weekly_equity_start - self.weekly_max_drawdown * 0.5:.2f})"
                     )
                     print(f"⚠️ Position size reduced at {weekly_drawdown*100:.2f}% drawdown")
 
                 # Check for recovery (restore full position size)
                 elif self.weekly_drawdown_level == 1:
-                    max_weekly_loss = self.weekly_equity_start - current_equity
-                    recovery_target = self.weekly_equity_start - (max_weekly_loss * settings.WEEKLY_RECOVERY_THRESHOLD)
+                    # Update peak drawdown if we dropped further
+                    current_loss = self.weekly_equity_start - current_equity
+                    if current_loss > self.weekly_max_drawdown:
+                        self.weekly_max_drawdown = current_loss
+
+                    # Recovery target: recover 50% of the PEAK loss
+                    recovery_target = self.weekly_equity_start - (self.weekly_max_drawdown * settings.WEEKLY_RECOVERY_THRESHOLD)
 
                     if current_equity >= recovery_target:
                         self.weekly_drawdown_level = 0
@@ -590,10 +600,15 @@ class RiskManager:
                         send_telegram_message(
                             f"✅ POSITION SIZE RESTORED\n\n"
                             f"Recovered 50%+ of weekly losses\n"
+                            f"Peak loss: ${self.weekly_max_drawdown:.2f}\n"
                             f"Current equity: ${current_equity:.2f}\n"
+                            f"Recovery: ${current_equity - (self.weekly_equity_start - self.weekly_max_drawdown):.2f}\n"
                             f"📈 Position size restored to 100%"
                         )
                         print(f"✅ Position size restored to 100%")
+
+                        # Reset max drawdown tracker
+                        self.weekly_max_drawdown = 0.0
 
         except Exception as e:
             logger.error(f"Error checking equity drawdowns: {e}")

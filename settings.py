@@ -108,6 +108,9 @@ PERFORMANCE_ANALYSIS_DAILY_MINUTE = 1
 PERFORMANCE_ANALYSIS_WEEKLY_DAY = 0  # Monday (0=Monday, 6=Sunday)
 PERFORMANCE_ANALYSIS_MONTHLY_DAY = 1  # 1st day of month
 
+# Initial investment for ROI calculation
+INITIAL_INVESTMENT = 5000  # USD - Used to calculate Return on Investment (ROI)
+
 # Symbol refresh settings
 SYMBOL_REFRESH_INTERVAL = 14400  # 4 hours
 

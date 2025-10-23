@@ -293,6 +293,9 @@ class PerformanceAnalyzer:
         current_equity = df['equity'].iloc[-1] if len(df) > 0 else self.initial_balance
         total_return = ((current_equity - self.initial_balance) / self.initial_balance * 100)
 
+        # ROI on initial investment
+        roi_on_investment = (total_pnl / settings.INITIAL_INVESTMENT * 100) if settings.INITIAL_INVESTMENT > 0 else 0
+
         # Consecutive wins/losses
         df['is_win'] = df['closedPnl'] > 0
         df['streak'] = df['is_win'].ne(df['is_win'].shift()).cumsum()
@@ -356,6 +359,8 @@ class PerformanceAnalyzer:
             'initial_balance': self.initial_balance,
             'final_balance': current_equity,
             'total_return_pct': total_return,
+            'initial_investment': settings.INITIAL_INVESTMENT,
+            'roi_on_investment': roi_on_investment,
 
             # Average metrics
             'avg_win': avg_win,
@@ -407,6 +412,8 @@ class PerformanceAnalyzer:
             'initial_balance': self.initial_balance,
             'final_balance': self.initial_balance,
             'total_return_pct': 0,
+            'initial_investment': settings.INITIAL_INVESTMENT,
+            'roi_on_investment': 0,
             'avg_win': 0,
             'avg_loss': 0,
             'avg_trade': 0,
@@ -605,6 +612,7 @@ Wins: {m['winning_trades']} | Losses: {m['losing_trades']} | BE: {m['breakeven_t
 **P&L:**
 Net Profit: ${m['net_profit']:.2f}
 Total Return: {m['total_return_pct']:.2f}%
+ROI on ${m['initial_investment']:.0f} Investment: {m['roi_on_investment']:.2f}%
 Gross Profit: ${m['gross_profit']:.2f}
 Gross Loss: ${m['gross_loss']:.2f}
 

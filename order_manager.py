@@ -510,12 +510,22 @@ def move_sl_to_breakeven(symbol: str) -> dict:
     
     return result_data
 
-def reconcile_positions_with_tracking(active_trades):
+def reconcile_positions_with_tracking(active_trades, bidirectional=False):
     """
-    DEBUGGING: Added debug logging to position reconciliation
+    Reconcile tracked trades with actual Bybit positions.
+
+    Args:
+        active_trades: Dictionary of tracked trades {(symbol, rule_id): trade_data}
+        bidirectional: If True, also detect and return untracked positions
+
+    Returns:
+        If bidirectional=False: List of externally closed trades [(symbol, rule_id), ...]
+        If bidirectional=True: Tuple of (externally_closed, untracked_positions)
+            - externally_closed: [(symbol, rule_id), ...]
+            - untracked_positions: [{'symbol': str, 'side': str, 'size': float, 'entry_price': float, 'unrealized_pnl': float}, ...]
     """
     print(f"🔄 Reconciling {len(active_trades)} tracked trades...")
-    
+
     try:
         ts = fetch_server_timestamp()
         params = {"category": "linear", "settleCoin": "USDT"}
@@ -527,60 +537,91 @@ def reconcile_positions_with_tracking(active_trades):
             'X-BAPI-RECV-WINDOW': RECV_WINDOW,
             'Content-Type': 'application/json'
         }
-        
+
         resp = requests.get(
             f"{BASE_URL}/v5/position/list",
             headers=headers,
             params=params
         )
-        
+
         if resp.status_code != 200:
             print(f"❌ Position reconciliation API error: {resp.status_code}")
-            return []
-            
+            return [] if not bidirectional else ([], [])
+
         data = resp.json()
         if data.get("retCode") != 0:
             print(f"❌ Position reconciliation API error: {data.get('retMsg')}")
-            return []
-        
+            return [] if not bidirectional else ([], [])
+
         # Get symbols with actual open positions
-        open_positions = set()
+        open_positions = {}  # {symbol: position_data}
         positions = data.get("result", {}).get("list", [])
         for pos in positions:
             size = abs(float(pos.get("size", 0)))
             if size > 0:
-                open_positions.add(pos.get("symbol"))
-        
-        print(f"🔄 Found {len(open_positions)} actual open positions: {list(open_positions)}")
+                symbol = pos.get("symbol")
+                open_positions[symbol] = pos
+
+        print(f"🔄 Found {len(open_positions)} actual open positions: {list(open_positions.keys())}")
         print(f"🔄 Tracking {len(active_trades)} trades: {list(active_trades.keys())}")
-        
-        # Check tracked trades against actual positions
+
+        # ─── DIRECTION 1: Check tracked trades against actual positions ───────────
         externally_closed = []
         trades_to_remove = []
-        
+        tracked_symbols = set()
+
         for trade_key, trade_data in active_trades.items():
             symbol, rule_id = trade_key
-            
+            tracked_symbols.add(symbol)
+
             # If we're tracking this trade but position doesn't exist
             if symbol not in open_positions:
                 print(f"🔄 Trade {symbol} ({rule_id}) not found in actual positions, marking as externally closed")
                 externally_closed.append((symbol, rule_id))
                 trades_to_remove.append(trade_key)
-                
+
                 # Log the external closure
                 trade_tracker.log_trade_closed(symbol, rule_id, "external_close")
             else:
                 print(f"🔄 Trade {symbol} ({rule_id}) confirmed in actual positions")
-        
+
         # Remove externally closed trades from tracking
         for trade_key in trades_to_remove:
             del active_trades[trade_key]
-            
+
         if externally_closed:
             print(f"🔄 Detected {len(externally_closed)} externally closed positions")
-            
-        return externally_closed
-        
+
+        # ─── DIRECTION 2: Check actual positions against tracked trades ───────────
+        untracked_positions = []
+        if bidirectional:
+            for symbol, pos_data in open_positions.items():
+                if symbol not in tracked_symbols:
+                    # Found an untracked position
+                    side = pos_data.get("side", "").lower()
+                    size = abs(float(pos_data.get("size", 0)))
+                    entry_price = float(pos_data.get("avgPrice", 0))
+                    unrealized_pnl = float(pos_data.get("unrealisedPnl", 0))
+
+                    untracked_positions.append({
+                        'symbol': symbol,
+                        'side': side,
+                        'size': size,
+                        'entry_price': entry_price,
+                        'unrealized_pnl': unrealized_pnl,
+                        'position_data': pos_data
+                    })
+                    print(f"⚠️ Found untracked position: {symbol} ({side}) size={size} entry=${entry_price} PnL=${unrealized_pnl}")
+
+            if untracked_positions:
+                print(f"⚠️ Detected {len(untracked_positions)} untracked positions")
+
+        # Return results based on mode
+        if bidirectional:
+            return externally_closed, untracked_positions
+        else:
+            return externally_closed
+
     except Exception as e:
         print(f"⚠️ Error reconciling positions: {e}")
-        return []
+        return [] if not bidirectional else ([], [])

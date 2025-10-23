@@ -92,10 +92,15 @@ class CFTPropBot:
             asyncio.create_task(self.trading_engine.refresh_symbols_and_data())
         ]
         
+        # ─── STARTUP POSITION RECONCILIATION ───────────────────────────────────────
+        # Perform bidirectional reconciliation to detect untracked positions
+        print("🔍 Performing startup position reconciliation...")
+        await self._perform_startup_reconciliation()
+
         # Send startup message
         active_trades = self.trading_engine.get_active_trades()
         symbols_count = len(self.trading_engine.current_symbols)
-        
+
         startup_msg = (
             f"🤖 Bot Started - {symbols_count} symbols, "
             f"{len(active_trades)} active trades, "
@@ -103,9 +108,9 @@ class CFTPropBot:
             f"🔄 Symbol refresh: Every 4 hours"
         )
         self.telegram_alerts.send_message(startup_msg)
-        system_logger.log_system_event("startup_complete", 
+        system_logger.log_system_event("startup_complete",
                                       f"Monitoring {symbols_count} symbols, {len(active_trades)} active trades")
-        
+
         print(f"🚀 All systems ready! Monitoring {symbols_count} symbols...")
     
     async def _balance_monitor(self):
@@ -198,7 +203,93 @@ class CFTPropBot:
                 
             except Exception as e:
                 print(f"⚠️ Memory cleanup error: {e}")
-    
+
+    async def _perform_startup_reconciliation(self):
+        """
+        Perform bidirectional position reconciliation on startup.
+        Detects:
+        1. Tracked trades that were externally closed
+        2. Untracked positions that need monitoring
+        """
+        try:
+            from order_manager import reconcile_positions_with_tracking
+            from datetime import datetime, timezone, timedelta
+            from .config.settings import trading_config
+
+            # Combine all tracked trades
+            all_tracked = {**self.trading_engine.active_trades, **self.trading_engine.breakeven_trades}
+
+            # Perform bidirectional reconciliation
+            externally_closed, untracked_positions = reconcile_positions_with_tracking(
+                all_tracked,
+                bidirectional=True
+            )
+
+            # ─── Handle externally closed positions ────────────────────────────────
+            if externally_closed:
+                print(f"⚠️ Startup: Found {len(externally_closed)} externally closed positions")
+                self.telegram_alerts.send_message(
+                    f"⚠️ Startup Reconciliation\n\n"
+                    f"Found {len(externally_closed)} positions that were closed externally:\n" +
+                    "\n".join([f"  • {symbol} ({rule_id})" for symbol, rule_id in externally_closed])
+                )
+
+            # ─── Handle untracked positions ────────────────────────────────────────
+            if untracked_positions:
+                print(f"⚠️ Startup: Found {len(untracked_positions)} untracked positions")
+
+                # Build notification message
+                msg_lines = [f"⚠️ Startup Reconciliation\n\nFound {len(untracked_positions)} untracked positions:\n"]
+
+                for pos in untracked_positions:
+                    symbol = pos['symbol']
+                    side = pos['side']
+                    size = pos['size']
+                    entry_price = pos['entry_price']
+                    unrealized_pnl = pos['unrealized_pnl']
+
+                    msg_lines.append(
+                        f"  • {symbol} ({side})\n"
+                        f"    Size: {size} | Entry: ${entry_price:.4f}\n"
+                        f"    Unrealized PnL: ${unrealized_pnl:.2f}"
+                    )
+
+                    # Add to active trades for monitoring
+                    # Use generic rule_id since we don't know which rule triggered it
+                    rule_id = "untracked_startup"
+                    trade_key = (symbol, rule_id)
+
+                    # Create trade data structure
+                    trade_data = {
+                        'entry_timestamp': datetime.now(timezone.utc) - timedelta(hours=1),  # Assume 1h old
+                        'entry_price': entry_price,
+                        'position_size': size,
+                        'rule_id': rule_id,
+                        'expiry_time': datetime.now(timezone.utc) + timedelta(hours=trading_config.TRADE_EXPIRY_HOURS),
+                        'take_profit': None,  # Unknown
+                        'stop_loss': None,    # Unknown
+                        'untracked_origin': True
+                    }
+
+                    # Add to active trades
+                    self.trading_engine.active_trades[trade_key] = trade_data
+                    print(f"✅ Added {symbol} to active trades for monitoring")
+
+                msg_lines.append(f"\n✅ All untracked positions are now being monitored")
+
+                self.telegram_alerts.send_message("\n".join(msg_lines))
+
+            # ─── Summary ────────────────────────────────────────────────────────────
+            if not externally_closed and not untracked_positions:
+                print("✅ Startup reconciliation: All positions in sync")
+            else:
+                print(f"✅ Startup reconciliation complete: {len(externally_closed)} closed, {len(untracked_positions)} untracked positions added")
+
+        except Exception as e:
+            print(f"⚠️ Startup reconciliation error: {e}")
+            import traceback
+            traceback.print_exc()
+
     async def _position_reconciliation_monitor(self):
         """Monitor position reconciliation"""
         print("🔧 Position reconciliation monitor started")
