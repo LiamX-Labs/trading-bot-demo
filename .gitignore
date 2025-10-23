@@ -70,8 +70,10 @@ temp/
 # But ignore backup logs
 trade_log_*.json
 
-# Backups (but keep backup folders for reference)
+# Backups (keep locally, don't commit to repo)
 *.backup
+backtesting_backup/
+original_backup/
 
 # Node modules (if any)
 node_modules/
@@ -84,20 +86,11 @@ backtesting/v2/results/*.json
 backtesting/v2/reports/*.txt
 backtesting/v2/data/cache/
 
-# Performance analysis outputs (keep JSON metadata, ignore large files)
-docs/performance_reports/*.pdf
+# Performance analysis outputs (generated files, keep local only)
+docs/performance_reports/
+docs/performance_*.pdf
+docs/performance_*.json
 docs/*.png
-
-# Keep important folders and files
-!original_backup/
-!backtesting_backup/
-!requirements.txt
-
-# Keep all markdown documentation
-!README.md
-!*.md
-!docs/*.md
-!backtesting/v2/*.md
 
 # Keep essential config and data files
 !trade_log.json
