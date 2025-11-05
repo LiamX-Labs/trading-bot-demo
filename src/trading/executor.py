@@ -17,6 +17,7 @@ from typing import Dict, Optional, Tuple, List
 
 from ..config.settings import api_config, trading_config
 from ..utils.helpers import create_optimized_session
+from ..integration.alpha_integration import get_integration
 
 
 class TradeExecutor:
@@ -27,14 +28,21 @@ class TradeExecutor:
         self._time_offset = 0
         self._last_sync_time = 0
         self._sync_interval = 60  # Re-sync every minute
-        
+
         # Market info cache
         self._market_info_cache = {}
         self._cache_ttl = 3600  # 1 hour
         self._max_cache_size = 200
-        
+
         # Async session for parallel execution
         self._session = None
+
+        # Alpha infrastructure integration
+        self.alpha_integration = get_integration(bot_id='lxalgo_001')
+        if self.alpha_integration.is_connected():
+            print(f"✅ Alpha integration initialized for lxalgo_001")
+        else:
+            print(f"⚠️ Alpha integration not connected, continuing without database")
     
     async def sync_time_with_server(self):
         """Synchronize time with Bybit server"""
@@ -261,9 +269,20 @@ class TradeExecutor:
         
         # Set trading stops asynchronously (non-blocking)
         asyncio.create_task(self._set_stops_with_retry(symbol, tp_price, sl_price, trail_offset, act_price))
-        
+
         print(f"✅ Opened {symbol} @ {price} Qty={qty}")
-        
+
+        # Log to Alpha infrastructure (PostgreSQL + Redis)
+        if hasattr(self, 'alpha_integration') and self.alpha_integration.is_connected():
+            self.alpha_integration.log_trade_opened(
+                symbol=symbol,
+                side=side,
+                entry_price=price,
+                position_size=qty,
+                rule_id=rule_id,
+                entry_timestamp=entry_timestamp
+            )
+
         # Return trade data immediately
         return {
             'entry_timestamp': entry_timestamp,
@@ -325,9 +344,20 @@ class TradeExecutor:
         
         # Set trading stops synchronously (non-blocking)
         self._set_trading_stop_sync(symbol, tp_price, sl_price, trail_offset, act_price)
-        
+
         print(f"✅ Opened {symbol} @ {price} Qty={qty}")
-        
+
+        # Log to Alpha infrastructure (PostgreSQL + Redis)
+        if hasattr(self, 'alpha_integration') and self.alpha_integration.is_connected():
+            self.alpha_integration.log_trade_opened(
+                symbol=symbol,
+                side=side,
+                entry_price=price,
+                position_size=qty,
+                rule_id=rule_id,
+                entry_timestamp=entry_timestamp
+            )
+
         # Return trade data
         return {
             'entry_timestamp': entry_timestamp,

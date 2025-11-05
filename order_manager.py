@@ -1,6 +1,7 @@
 # order_manager.py - AWS EC2 Free Tier Optimized Version
 
 import os
+import sys
 import json
 import hmac
 import hashlib
@@ -8,6 +9,7 @@ import requests
 import math
 import time
 from datetime import datetime, timezone, timedelta
+from pathlib import Path
 from telegram_alerts import send_telegram_message, batch_notifier
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
@@ -15,6 +17,25 @@ from functools import lru_cache
 from trade_tracker import trade_tracker, enhance_active_trades_structure, get_trade_age_hours
 
 import settings
+
+# Add Alpha integration
+sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent))
+from shared.alpha_db_client import AlphaDBClient
+
+# Initialize Alpha integration (singleton pattern)
+_alpha_integration = None
+
+def get_alpha_integration():
+    """Get or create Alpha integration instance"""
+    global _alpha_integration
+    if _alpha_integration is None:
+        try:
+            _alpha_integration = AlphaDBClient(bot_id='lxalgo_001', redis_db=1)
+            print("✅ Alpha integration initialized in order_manager")
+        except Exception as e:
+            print(f"⚠️ Alpha integration failed: {e}")
+            _alpha_integration = None
+    return _alpha_integration
 
 # Constants & credentials from settings
 USE_DEMO                = settings.USE_DEMO
@@ -277,10 +298,47 @@ def close_trade(symbol, rule_id=None, reason="manual"):
                 if result.get("retCode") == 0:
                     print(f"🔒 Closed {symbol}")
                     trade_closed = True
-                    
+
                     # LOG TRADE CLOSURE
                     if rule_id:
                         trade_tracker.log_trade_closed(symbol, rule_id, reason)
+
+                        # Also log to Alpha infrastructure
+                        alpha_client = get_alpha_integration()
+                        if alpha_client:
+                            try:
+                                # Get execution price from order result
+                                exec_price = float(result.get("result", {}).get("avgPrice", 0))
+                                if exec_price == 0:
+                                    exec_price = float(pos.get("avgPrice", 0))  # Fallback to position avg price
+
+                                # Record the exit fill
+                                order_id = result.get("result", {}).get("orderId", "unknown")
+                                from shared.alpha_db_client import create_client_order_id
+                                alpha_client.write_fill(
+                                    symbol=symbol,
+                                    side=close_side,
+                                    exec_price=exec_price,
+                                    exec_qty=size,
+                                    order_id=order_id,
+                                    client_order_id=create_client_order_id('lxalgo_001', reason),
+                                    close_reason=reason,
+                                    commission=float(result.get("result", {}).get("execFee", 0)),
+                                    exec_time=datetime.now(timezone.utc)
+                                )
+
+                                # Update position to flat in Redis
+                                alpha_client.update_position_redis(
+                                    symbol=symbol,
+                                    size=0.0,
+                                    side='None',
+                                    avg_price=0.0,
+                                    unrealized_pnl=0.0
+                                )
+
+                                print(f"📊 Trade exit logged to Alpha infrastructure: {symbol}")
+                            except Exception as e:
+                                print(f"⚠️ Failed to log exit to Alpha: {e}")
                     
             except ValueError:
                 pass
