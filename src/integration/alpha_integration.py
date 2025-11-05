@@ -95,10 +95,13 @@ class LXAlgoAlphaIntegration:
             # Create trade ID from rule and timestamp
             trade_id = f"{self.bot_id}_{symbol}_{rule_id}_{int(entry_timestamp.timestamp())}"
 
+            # Capitalize side for PostgreSQL constraint (Buy/Sell not buy/sell)
+            side_capitalized = side.capitalize() if side else side
+
             # Record entry fill
             self.db_client.write_fill(
                 symbol=symbol,
-                side=side,
+                side=side_capitalized,
                 exec_price=entry_price,
                 exec_qty=position_size,
                 order_id=trade_id,
@@ -112,7 +115,7 @@ class LXAlgoAlphaIntegration:
             self.db_client.update_position_redis(
                 symbol=symbol,
                 size=position_size,
-                side=side,
+                side=side_capitalized,
                 avg_price=entry_price,
                 unrealized_pnl=0.0
             )
