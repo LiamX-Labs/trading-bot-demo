@@ -798,6 +798,14 @@
       "rule_id": "Rule 8",
       "entry_price": 0.07286,
       "position_size": 2744.0
+    },
+    {
+      "timestamp": "2025-11-07T05:15:01.834532+00:00",
+      "event": "opened",
+      "symbol": "SOONUSDT",
+      "rule_id": "Rule 8",
+      "entry_price": 1.4398,
+      "position_size": 138.0
     }
   ]
 }
