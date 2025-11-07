@@ -31,23 +31,23 @@ API_RETRY_DELAY = 0.5
 # TRADING STRATEGY PARAMETERS
 # ═══════════════════════════════════════════════════════════════════════════════
 
-# Signal generation parameters
-PUMP_LOOKBACK = 12  # 1 hour = 12 periods of 5min bars
-PUMP_THRESHOLD = 8  # 8% pump threshold for backtesting
-TIMEFRAME = "5"  # 5-minute timeframe
+# Signal generation parameters - DEMO VALUES - Optimize via backtesting
+PUMP_LOOKBACK = 12  # Example: 1 hour lookback (12 x 5min bars) - adjust as needed
+PUMP_THRESHOLD = 6  # Example threshold - test different values (5-10%)
+TIMEFRAME = "5"  # 5-minute timeframe - can use "15", "60", etc.
 
-# Position sizing and risk management
-BASE_POSITION_SIZE_USD = 200
-MAX_ACTIVE_TRADES = 20
+# Position sizing and risk management - Configure based on your capital
+BASE_POSITION_SIZE_USD = 150  # Example: $150 per trade - adjust to your account size
+MAX_ACTIVE_TRADES = 15  # Example: 15 max concurrent positions - test lower values first
 
-# Stop loss and take profit settings
-STOPLOSS_PERCENT = 8
-TAKEPROFIT_PERCENT = 30  # 30% take profit target
-TRAIL_ACTIVATION_PERCENT = 20
-TRAIL_OFFSET_PERCENT = 10
+# Stop loss and take profit settings - CRITICAL: Backtest these thoroughly
+STOPLOSS_PERCENT = 8  # Example: 8% stop loss - adjust based on volatility
+TAKEPROFIT_PERCENT = 25  # Example: 25% target - optimize via backtesting
+TRAIL_ACTIVATION_PERCENT = 15  # Example: Start trailing at 15% profit
+TRAIL_OFFSET_PERCENT = 8  # Example: 8% trailing offset
 
-# Breakeven management
-BREAKEVEN_THRESHOLD = 8.0  # Profit percentage to trigger breakeven move
+# Breakeven management - Adjust based on your risk preference
+BREAKEVEN_THRESHOLD = 8.0  # Example: Move to breakeven at 8% profit
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # RISK MANAGEMENT PARAMETERS
@@ -61,20 +61,20 @@ UNREALIZED_ACTIVATION_MULTIPLIER = 2  # Activation at 2x base position size
 DAILY_BALANCE_DRAWDOWN_THRESHOLD = 0.25  # 25% daily drop triggers liquidation
 
 # ─── EQUITY-BASED DRAWDOWN SYSTEM ─────────────────────────────────────────────
-# Daily equity drawdown (circuit breaker)
-DAILY_EQUITY_DRAWDOWN_THRESHOLD = 0.02  # 2% daily equity drop triggers circuit breaker
-DAILY_CIRCUIT_BREAKER_PAUSE_HOURS = 24  # Pause trading until next day 00:01 UTC
+# Daily equity drawdown (circuit breaker) - Example conservative values
+DAILY_EQUITY_DRAWDOWN_THRESHOLD = 0.02  # Example: 2% daily drop - adjust based on risk tolerance
+DAILY_CIRCUIT_BREAKER_PAUSE_HOURS = 24  # Example: Pause 24h - can adjust to 12h or 6h
 
-# Weekly equity drawdown (progressive risk reduction)
-WEEKLY_EQUITY_DRAWDOWN_THRESHOLD_LEVEL1 = 0.04  # 4% weekly drop reduces position size
-WEEKLY_EQUITY_DRAWDOWN_THRESHOLD_LEVEL2 = 0.06  # 6% weekly drop halts trading until Monday
-WEEKLY_POSITION_SIZE_REDUCTION = 0.50  # Reduce position size by 50%
-WEEKLY_RECOVERY_THRESHOLD = 0.50  # Recover 50% of losses to restore full position size
+# Weekly equity drawdown (progressive risk reduction) - Configure for your strategy
+WEEKLY_EQUITY_DRAWDOWN_THRESHOLD_LEVEL1 = 0.04  # Example: 4% for level 1
+WEEKLY_EQUITY_DRAWDOWN_THRESHOLD_LEVEL2 = 0.06  # Example: 6% for level 2
+WEEKLY_POSITION_SIZE_REDUCTION = 0.50  # Example: Reduce by 50% - test 30-70%
+WEEKLY_RECOVERY_THRESHOLD = 0.50  # Example: Recover 50% to restore size
 WEEKLY_HALT_PAUSE_UNTIL_MONDAY = True  # Pause until Monday 00:01 UTC
 
-# Trade age limits
-TRADE_MAX_AGE_HOURS = 72  # Auto-expire trades after 72 hours
-NEGATIVE_PNL_CLOSE_HOURS = 8  # Close negative trades after 8 hours
+# Trade age limits - Adjust based on your holding period strategy
+TRADE_MAX_AGE_HOURS = 72  # Example: Auto-expire after 72h - can use 48h or 96h
+NEGATIVE_PNL_CLOSE_HOURS = 8  # Example: Close losers after 8h - test 6h, 12h, etc.
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # COOLDOWN AND RESTRICTION SETTINGS
