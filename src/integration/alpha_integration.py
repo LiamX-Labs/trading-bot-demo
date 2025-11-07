@@ -99,7 +99,7 @@ class LXAlgoAlphaIntegration:
             side_capitalized = side.capitalize() if side else side
 
             # Record entry fill
-            self.db_client.write_fill(
+            fill_id = self.db_client.write_fill(
                 symbol=symbol,
                 side=side_capitalized,
                 exec_price=entry_price,
@@ -111,20 +111,46 @@ class LXAlgoAlphaIntegration:
                 exec_time=entry_timestamp
             )
 
-            # Update position in Redis
-            self.db_client.update_position_redis(
+            # 🔥 NEW: Create position entry for proper position tracking
+            self.db_client.create_position_entry(
                 symbol=symbol,
-                size=position_size,
-                side=side_capitalized,
-                avg_price=entry_price,
-                unrealized_pnl=0.0
+                entry_price=entry_price,
+                quantity=position_size,
+                entry_time=entry_timestamp,
+                entry_order_id=trade_id,
+                entry_fill_id=fill_id,
+                commission=0.0
             )
 
-            logger.info(f"📊 Trade entry logged: {symbol} {side} {position_size} @ {entry_price} (rule: {rule_id})")
+            # Get current position summary (weighted average across all entries)
+            position = self.db_client.get_current_position_summary(symbol)
+            if position:
+                # Update Redis with weighted average price
+                self.db_client.update_position_redis(
+                    symbol=symbol,
+                    size=float(position['total_qty']),
+                    side=side_capitalized,
+                    avg_price=float(position['avg_entry_price']),
+                    unrealized_pnl=0.0
+                )
+                logger.info(f"📊 Trade entry logged: {symbol} {side} {position_size} @ {entry_price} (rule: {rule_id}), weighted avg: ${float(position['avg_entry_price']):.4f}")
+            else:
+                # Fallback if position summary fails
+                self.db_client.update_position_redis(
+                    symbol=symbol,
+                    size=position_size,
+                    side=side_capitalized,
+                    avg_price=entry_price,
+                    unrealized_pnl=0.0
+                )
+                logger.info(f"📊 Trade entry logged: {symbol} {side} {position_size} @ {entry_price} (rule: {rule_id})")
+
             return True
 
         except Exception as e:
             logger.error(f"❌ Failed to log trade entry: {e}")
+            import traceback
+            traceback.print_exc()
             return False
 
     def log_trade_closed(
@@ -161,6 +187,7 @@ class LXAlgoAlphaIntegration:
 
             # Create trade ID
             trade_id = f"{self.bot_id}_{symbol}_exit_{int(datetime.utcnow().timestamp())}"
+            exit_time = datetime.utcnow()
 
             # Record exit fill
             self.db_client.write_fill(
@@ -172,23 +199,51 @@ class LXAlgoAlphaIntegration:
                 client_order_id=create_client_order_id(self.bot_id, reason),
                 close_reason=reason,
                 commission=0.0,  # Will be updated from actual order
-                exec_time=datetime.utcnow()
+                exec_time=exit_time
             )
 
-            # Update position to flat in Redis
-            self.db_client.update_position_redis(
+            # 🔥 NEW: Close position using FIFO matching
+            completed_trades = self.db_client.close_position_fifo(
                 symbol=symbol,
-                size=0.0,
-                side='None',
-                avg_price=0.0,
-                unrealized_pnl=0.0
+                exit_price=exit_price,
+                close_qty=position_size,
+                exit_time=exit_time,
+                exit_reason=reason,
+                exit_commission=0.0
             )
 
-            logger.info(f"📊 Trade exit logged: {symbol} PnL: ${pnl:.2f} - {reason}")
+            # Log completed trades
+            total_pnl = sum(t['net_pnl'] for t in completed_trades)
+            logger.info(f"📊 Trade exit logged: {symbol} closed {len(completed_trades)} entries, Total P&L: ${total_pnl:+.2f} - {reason}")
+
+            # Check remaining position
+            position = self.db_client.get_current_position_summary(symbol)
+            if position and float(position['total_qty']) > 0:
+                # Partial close - update Redis with remaining position
+                self.db_client.update_position_redis(
+                    symbol=symbol,
+                    size=float(position['total_qty']),
+                    side=side,
+                    avg_price=float(position['avg_entry_price']),
+                    unrealized_pnl=0.0
+                )
+                logger.info(f"📊 Partial close: {float(position['total_qty'])} remaining @ ${float(position['avg_entry_price']):.4f}")
+            else:
+                # Full close - update position to flat in Redis
+                self.db_client.update_position_redis(
+                    symbol=symbol,
+                    size=0.0,
+                    side='None',
+                    avg_price=0.0,
+                    unrealized_pnl=0.0
+                )
+
             return True
 
         except Exception as e:
             logger.error(f"❌ Failed to log trade exit: {e}")
+            import traceback
+            traceback.print_exc()
             return False
 
     # ========================================

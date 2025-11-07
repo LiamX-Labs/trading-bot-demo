@@ -315,6 +315,9 @@ def close_trade(symbol, rule_id=None, reason="manual"):
                                 # Record the exit fill
                                 order_id = result.get("result", {}).get("orderId", "unknown")
                                 from shared.alpha_db_client import create_client_order_id
+                                exit_commission = float(result.get("result", {}).get("execFee", 0))
+                                exit_time = datetime.now(timezone.utc)
+
                                 alpha_client.write_fill(
                                     symbol=symbol,
                                     side=close_side,
@@ -323,18 +326,46 @@ def close_trade(symbol, rule_id=None, reason="manual"):
                                     order_id=order_id,
                                     client_order_id=create_client_order_id('lxalgo_001', reason),
                                     close_reason=reason,
-                                    commission=float(result.get("result", {}).get("execFee", 0)),
-                                    exec_time=datetime.now(timezone.utc)
+                                    commission=exit_commission,
+                                    exec_time=exit_time
                                 )
 
-                                # Update position to flat in Redis
-                                alpha_client.update_position_redis(
-                                    symbol=symbol,
-                                    size=0.0,
-                                    side='None',
-                                    avg_price=0.0,
-                                    unrealized_pnl=0.0
-                                )
+                                # 🔥 NEW: Close position using FIFO matching
+                                # This handles partial closes correctly and matches with proper entries
+                                try:
+                                    # Divide by 2 because of dual bot instances
+                                    actual_close_qty = size / 2
+
+                                    completed_trades = alpha_client.close_position_fifo(
+                                        symbol=symbol,
+                                        exit_price=exec_price,
+                                        close_qty=actual_close_qty,
+                                        exit_time=exit_time,
+                                        exit_reason=reason,
+                                        exit_order_id=order_id,
+                                        exit_commission=exit_commission / 2  # Halve commission too
+                                    )
+
+                                    # Log results
+                                    total_pnl = sum(t['net_pnl'] for t in completed_trades)
+                                    print(f"✅ Position closed (FIFO): {symbol}")
+                                    print(f"   Closed {len(completed_trades)} entries")
+                                    print(f"   Total P&L: ${total_pnl:+.2f}")
+
+                                    for trade in completed_trades:
+                                        print(f"   Entry: {trade['quantity']:.4f} @ ${trade['entry_price']:.4f}")
+                                        print(f"   P&L: ${trade['net_pnl']:+.2f} ({trade['pnl_pct']:+.2f}%)")
+
+                                except Exception as e:
+                                    print(f"⚠️ Failed to close position with FIFO: {e}")
+                                    # Fallback: just update Redis to flat
+                                    alpha_client.update_position_redis(
+                                        symbol=symbol,
+                                        size=0.0,
+                                        side='None',
+                                        avg_price=0.0,
+                                        unrealized_pnl=0.0
+                                    )
 
                                 print(f"📊 Trade exit logged to Alpha infrastructure: {symbol}")
                             except Exception as e:
@@ -467,9 +498,61 @@ def open_trade(symbol, side, price, row, rule_id):
 
     print(f"✅ Opened {symbol} @ {price} Qty={qty}")
 
+    # 🔥 ALPHA INTEGRATION: Record fill and create position entry
+    alpha_client = get_alpha_integration()
+    print(f"🔍 DEBUG: alpha_client = {alpha_client}")
+    if alpha_client:
+        print(f"🔍 DEBUG: About to record fill and position entry for {symbol}")
+        try:
+            order_id = res.get("result", {}).get("orderId", "unknown")
+            exec_price = float(res.get("result", {}).get("avgPrice", price))
+            commission = float(res.get("result", {}).get("cumExecFee", 0))
+
+            # Record fill
+            fill_id = alpha_client.write_fill(
+                symbol=symbol,
+                side=side.capitalize(),
+                exec_price=exec_price,
+                exec_qty=qty,
+                order_id=order_id,
+                client_order_id=create_client_order_id('lxalgo_001', 'entry'),
+                close_reason='entry',
+                commission=commission,
+                exec_time=entry_timestamp
+            )
+
+            # Create position entry (NEW - for proper position tracking)
+            alpha_client.create_position_entry(
+                symbol=symbol,
+                entry_price=exec_price,
+                quantity=qty,
+                entry_time=entry_timestamp,
+                entry_order_id=order_id,
+                entry_fill_id=fill_id,
+                commission=commission
+            )
+
+            # Get current position summary (weighted average)
+            position = alpha_client.get_current_position_summary(symbol)
+            if position:
+                # Update Redis with weighted average
+                alpha_client.update_position_redis(
+                    symbol=symbol,
+                    size=float(position['total_qty']),
+                    side=side.capitalize(),
+                    avg_price=float(position['avg_entry_price']),
+                    unrealized_pnl=0.0
+                )
+                print(f"📊 Position entry created: {symbol} (Weighted avg: ${float(position['avg_entry_price']):.4f})")
+
+        except Exception as e:
+            print(f"⚠️ Failed to record position entry to Alpha: {e}")
+            import traceback
+            traceback.print_exc()
+
     # USE BATCH NOTIFICATION INSTEAD OF INDIVIDUAL MESSAGE
     batch_notifier.add_trade_alert(symbol, price, tp_price, sl_price, rule_id)
-    
+
     # RETURN ENHANCED TRADE DATA for active_trades
     return {
         'entry_timestamp': entry_timestamp,

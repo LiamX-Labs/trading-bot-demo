@@ -19,6 +19,7 @@ import settings
 from .core.trading_engine import TradingEngine
 from .config.settings import trading_config, system_config
 from .config.bridge import sync_legacy_settings
+from .monitors.fill_monitor import FillMonitor
 
 
 class TelegramAlertsWrapper:
@@ -35,23 +36,30 @@ class CFTPropBot:
     def __init__(self):
         # Initialize telegram alerts first
         self.telegram_alerts = TelegramAlertsWrapper()
-        
+
         # Initialize new trading engine
         self.trading_engine = TradingEngine(
             risk_manager=None,  # Will be set after risk manager creation
             trade_tracker=trade_tracker,
             telegram_alerts=self.telegram_alerts
         )
-        
+
         # Initialize risk manager with trading engine reference
         self.risk_manager = RiskManager(
             lambda: self.trading_engine.get_active_trades(),
             trading_engine=self.trading_engine
         )
-        
+
         # Set the risk manager reference in trading engine
         self.trading_engine.risk_manager = self.risk_manager
-        
+
+        # Initialize fill monitor for tracking trade closures
+        self.fill_monitor = FillMonitor(
+            trading_engine=self.trading_engine,
+            bot_id='lxalgo_001',
+            redis_db=1
+        )
+
         # Monitor tasks
         self.monitor_tasks = []
     
@@ -78,7 +86,7 @@ class CFTPropBot:
     async def _start_monitors(self):
         """Start all monitoring tasks"""
         print("🔧 Starting monitoring systems...")
-        
+
         self.monitor_tasks = [
             asyncio.create_task(self._balance_monitor()),
             asyncio.create_task(self._pnl_monitor()),
@@ -89,7 +97,8 @@ class CFTPropBot:
             asyncio.create_task(self._memory_cleanup_monitor()),
             asyncio.create_task(self._position_reconciliation_monitor()),
             asyncio.create_task(self._negative_pnl_monitor()),
-            asyncio.create_task(self.trading_engine.refresh_symbols_and_data())
+            asyncio.create_task(self.trading_engine.refresh_symbols_and_data()),
+            asyncio.create_task(self.fill_monitor.start_monitoring())  # NEW: Fill monitor for trade closures
         ]
         
         # ─── STARTUP POSITION RECONCILIATION ───────────────────────────────────────
@@ -762,14 +771,20 @@ class CFTPropBot:
 
 async def main():
     """Main application entry point"""
+
+    # Note: LXAlgo has its own position recovery system in the bot initialization
+    # The position_entries table will be populated as new trades are opened/closed
+    # No startup reconciliation needed - just ensure order_manager.py creates entries
+
+    # Continue with normal startup
     bot = CFTPropBot()
-    
+
     try:
         await bot.start()
-        
+
     except KeyboardInterrupt:
         print("🛑 Bot stopped by user")
-        
+
     except Exception as e:
         print(f"❌ Bot crashed: {e}")
         send_telegram_message(f"❌ Bot crashed: {str(e)}")
